@@ -63,6 +63,7 @@
             opacity: 0;
             transform: scale(.97)
         }
+
         to {
             opacity: 1;
             transform: scale(1)
@@ -129,8 +130,8 @@
             <h1 class="text-xl md:text-2xl font-serif font-bold text-brand-dark">Gestión de Productos</h1>
         </div>
         @if (auth()->user()->rol_id === 1)
-        <button onclick="openModal('create')" 
-            class="flex items-center gap-2 px-4 py-2.5 bg-brand-accent text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all" 
+        <button onclick="openModal('create')"
+            class="flex items-center gap-2 px-4 py-2.5 bg-brand-accent text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all"
             style="box-shadow: 0 4px 12px rgba(59,130,246,.25);">
             <i class="fas fa-plus text-xs"></i> <span>Nuevo producto</span>
         </button>
@@ -200,19 +201,19 @@
                     <span class="absolute inset-y-0 left-3 flex items-center text-slate-400 pointer-events-none">
                         <i class="fas fa-search text-sm"></i>
                     </span>
-                    <input type="text" id="search-input" placeholder="Nombre, talla, color..." oninput="filterTable()" 
+                    <input type="text" id="search-input" placeholder="Nombre, talla, color..." oninput="filterTable()"
                         class="pl-10 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none transition w-64">
                 </div>
                 <!-- Filtro Categoría -->
-                <select id="filter-cat" onchange="filterTable()" 
+                <select id="filter-cat" onchange="filterTable()"
                     class="py-2.5 px-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 cursor-pointer focus:outline-none transition">
                     <option value="">Todas las categorías</option>
                     @foreach ($categorias as $c)
-                        <option value="{{ $c->id }}">{{ $c->nombre }}</option>
+                    <option value="{{ $c->id }}">{{ $c->nombre }}</option>
                     @endforeach
                 </select>
                 <!-- Filtro Estado Stock -->
-                <select id="filter-estado" onchange="filterTable()" 
+                <select id="filter-estado" onchange="filterTable()"
                     class="py-2.5 px-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 cursor-pointer focus:outline-none transition">
                     <option value="">Todos los estados</option>
                     <option value="Activo">Activos</option>
@@ -228,21 +229,21 @@
                 <thead>
                     <tr>
                         @foreach (['Producto', 'Categoría', 'Talla / Color', 'Precio Venta', 'Stock', 'Estado', ''] as $h)
-                            <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-100">{{ $h }}</th>
+                        <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-100">{{ $h }}</th>
                         @endforeach
                     </tr>
                 </thead>
                 <tbody id="table-body">
                     @forelse ($productos as $p)
-                        @php
-                            $activo  = $p->estado === 'Activo';
-                            $critico = $p->stock > 0 && $p->stock <= $p->stock_minimo;
-                            $agotado = $p->stock == 0;
-                            $stockStatus = $agotado ? 'agotado' : ($critico ? 'critico' : 'ok');
-                            $esAdmin = auth()->user()->rol_id === 1;
+                    @php
+                    $activo = $p->estado === 'Activo';
+                    $critico = $p->stock > 0 && $p->stock <= $p->stock_minimo;
+                        $agotado = $p->stock == 0;
+                        $stockStatus = $agotado ? 'agotado' : ($critico ? 'critico' : 'ok');
+                        $esAdmin = auth()->user()->rol_id === 1;
                         @endphp
-                        <tr class="trow" 
-                            id="row-{{ $p->id }}" 
+                        <tr class="trow"
+                            id="row-{{ $p->id }}"
                             data-search="{{ strtolower($p->nombre . ' ' . $p->talla . ' ' . $p->color . ' ' . ($p->categoria->nombre ?? '')) }}"
                             data-cat="{{ $p->categoria_id }}"
                             data-estado="{{ $p->estado }}"
@@ -265,47 +266,47 @@
                             </td>
                             <td class="px-6 py-4 border-b border-slate-50">
                                 @if ($agotado)
-                                    <span class="badge bg-red-100 text-red-700">
-                                        <i class="fas fa-times-circle mr-1 text-xs"></i>Agotado
-                                    </span>
+                                <span class="badge bg-red-100 text-red-700">
+                                    <i class="fas fa-times-circle mr-1 text-xs"></i>Agotado
+                                </span>
                                 @elseif ($critico)
-                                    <span class="badge bg-amber-100 text-amber-700">
-                                        <i class="fas fa-exclamation-triangle mr-1 text-xs"></i>{{ $p->stock }} uds
-                                    </span>
+                                <span class="badge bg-amber-100 text-amber-700">
+                                    <i class="fas fa-exclamation-triangle mr-1 text-xs"></i>{{ $p->stock }} uds
+                                </span>
                                 @else
-                                    <span class="badge bg-emerald-100 text-emerald-700">
-                                        <i class="fas fa-check mr-1 text-xs"></i>{{ $p->stock }} uds
-                                    </span>
+                                <span class="badge bg-emerald-100 text-emerald-700">
+                                    <i class="fas fa-check mr-1 text-xs"></i>{{ $p->stock }} uds
+                                </span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 border-b border-slate-50" onclick="event.stopPropagation()">
                                 @if ($esAdmin)
-                                    <div class="flex items-center gap-2 cursor-pointer" onclick="toggleEstado(this, {{ $p->id }})">
-                                        <div class="toggle {{ $activo ? 'on' : 'off' }}"></div>
-                                        <span class="text-xs text-slate-600 estado-label">{{ $p->estado }}</span>
-                                    </div>
+                                <div class="flex items-center gap-2 cursor-pointer" onclick="toggleEstado(this, {{ $p->id }})">
+                                    <div class="toggle {{ $activo ? 'on' : 'off' }}"></div>
+                                    <span class="text-xs text-slate-600 estado-label">{{ $p->estado }}</span>
+                                </div>
                                 @else
-                                    <span class="badge {{ $activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">{{ $p->estado }}</span>
+                                <span class="badge {{ $activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">{{ $p->estado }}</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 border-b border-slate-50" onclick="event.stopPropagation()">
                                 @if ($esAdmin)
-                                    <button onclick="editarProducto({{ $p->id }})"
-                                        class="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition"
-                                        title="Editar producto">
-                                        <i class="fas fa-edit text-xs"></i>
-                                    </button>
+                                <button onclick="editarProducto({{ $p->id }})"
+                                    class="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition"
+                                    title="Editar producto">
+                                    <i class="fas fa-edit text-xs"></i>
+                                </button>
                                 @endif
                             </td>
                         </tr>
-                    @empty
+                        @empty
                         <tr>
                             <td colspan="7" class="px-6 py-16 text-center text-slate-400">
                                 <i class="fas fa-box-open text-4xl mb-3 block opacity-20"></i>
                                 <p class="text-sm">No hay productos registrados aún</p>
                             </td>
                         </tr>
-                    @endforelse
+                        @endforelse
                 </tbody>
             </table>
             <!-- Paginador de Productos -->
@@ -359,7 +360,7 @@
                     <select name="categoria_id" id="prod-cat" required class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
                         <option value="">Seleccionar...</option>
                         @foreach ($categorias as $c)
-                            <option value="{{ $c->id }}">{{ $c->nombre }}</option>
+                        <option value="{{ $c->id }}">{{ $c->nombre }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -488,7 +489,7 @@
     }
 
     // ── Filtros en cliente ────────────────────────────────────────────────────────
-    function filterTable() {
+    function filtroProductosTable() {
         const q = document.getElementById('search-input').value.toLowerCase();
         const cat = document.getElementById('filter-cat').value;
         const estado = document.getElementById('filter-estado').value;
@@ -497,7 +498,7 @@
         document.querySelectorAll('#table-body tr[id^="row-"]').forEach(row => {
             const matchQ = !q || row.dataset.search.includes(q);
             const matchC = !cat || row.dataset.cat === cat;
-            
+
             let matchE = true;
             if (estado === 'Activo' || estado === 'Inactivo') {
                 matchE = row.dataset.estado === estado;
@@ -517,7 +518,7 @@
         });
 
         document.getElementById('empty-state').classList.toggle('hidden', visible > 0);
-        
+
         currentProductsPage = 1;
         applyProductsPagination();
     }
@@ -530,30 +531,33 @@
         const nuevo = isOn ? 'Inactivo' : 'Activo';
 
         fetch(`${BASE_URL}/${id}/toggle-estado`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify({ estado: nuevo })
-        })
-        .then(r => r.json())
-        .then(d => {
-            if (d.ok) {
-                toggle.classList.toggle('on', !isOn);
-                toggle.classList.toggle('off', isOn);
-                label.textContent = nuevo;
-                const row = document.getElementById('row-' + id);
-                if (row) row.dataset.estado = nuevo;
-                showToast('Estado actualizado', 'success');
-            } else {
-                showToast(d.msg || 'Error al cambiar estado', 'error');
-            }
-        });
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    estado: nuevo
+                })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) {
+                    toggle.classList.toggle('on', !isOn);
+                    toggle.classList.toggle('off', isOn);
+                    label.textContent = nuevo;
+                    const row = document.getElementById('row-' + id);
+                    if (row) row.dataset.estado = nuevo;
+                    showToast('Estado actualizado', 'success');
+                } else {
+                    showToast(d.msg || 'Error al cambiar estado', 'error');
+                }
+            });
     }
 
     // ── Modal Apertura / Cierre ──────────────────────────────────────────────────
-    @if (auth()->user()->rol_id === 1)
+    @if(auth() - > user() - > rol_id === 1)
+
     function openModal(mode, data = null) {
         const modal = document.getElementById('modal-prod');
         const form = document.getElementById('form-prod');
@@ -588,10 +592,10 @@
             .then(r => r.json())
             .then(p => {
                 if (!p) return;
-                
+
                 form.action = `${BASE_URL}/${id}`;
                 methodInput.value = 'PUT';
-                
+
                 document.getElementById('prod-nombre').value = p.nombre;
                 document.getElementById('prod-desc').value = p.descripcion || '';
                 document.getElementById('prod-cat').value = p.categoria_id;
@@ -602,7 +606,7 @@
                 document.getElementById('prod-pv').value = p.precio_venta;
                 document.getElementById('prod-stock').value = p.stock;
                 document.getElementById('prod-smin').value = p.stock_minimo;
-                
+
                 title.textContent = 'Editar producto';
                 btnText.textContent = 'Actualizar producto';
                 modal.classList.remove('hidden');
@@ -641,23 +645,23 @@
     }
 
     // Mostrar Toast si existe sesión de redirección con "toast" de Laravel
-    @if (session('toast'))
-        document.addEventListener('DOMContentLoaded', () => {
-            showToast(@json(session('toast')['text']), @json(session('toast')['type']));
-        });
+    @if(session('toast'))
+    document.addEventListener('DOMContentLoaded', () => {
+        showToast(@json(session('toast')['text']), @json(session('toast')['type']));
+    });
     @endif
 
     // Mostrar errores de validación con SweetAlert2
-    @if ($errors->any())
-        document.addEventListener('DOMContentLoaded', () => {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error de Validación',
-                html: `{!! implode('<br>', $errors->all()) !!}`,
-                confirmButtonColor: '#2563eb',
-                confirmButtonText: 'Entendido'
-            });
+    @if($errors - > any())
+    document.addEventListener('DOMContentLoaded', () => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Validación',
+            html: `{!! implode('<br>', $errors->all()) !!}`,
+            confirmButtonColor: '#2563eb',
+            confirmButtonText: 'Entendido'
         });
+    });
     @endif
 </script>
 @endpush
