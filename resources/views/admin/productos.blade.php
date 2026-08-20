@@ -489,7 +489,7 @@
     }
 
     // ── Filtros en cliente ────────────────────────────────────────────────────────
-    function filtroProductosTable() {
+    function filterTable() {
         const q = document.getElementById('search-input').value.toLowerCase();
         const cat = document.getElementById('filter-cat').value;
         const estado = document.getElementById('filter-estado').value;
@@ -581,7 +581,7 @@
     }
 
     // Editar producto vía consulta AJAX (para poblar los campos del modal)
-    function editarProducto(id) {
+    function UpdateProducto(id) {
         const modal = document.getElementById('modal-prod');
         const form = document.getElementById('form-prod');
         const methodInput = document.getElementById('form-method');
