@@ -8,6 +8,7 @@ use App\Models\Inventario;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -51,6 +52,8 @@ class ProductoController extends Controller
             'color' => ['required', 'string', 'max:30'],
             'estado' => ['required', Rule::in(['Activo', 'Inactivo'])],
             'categoria_id' => ['required', 'exists:categorias,id'],
+            'imagen' => ['nullable'],
+            'imagen_file' => ['nullable', 'image', 'max:6144'],
         ], [
             'nombre.required' => 'El nombre del producto es obligatorio.',
             'categoria_id.required' => 'La categoría es obligatoria.',
@@ -69,22 +72,39 @@ class ProductoController extends Controller
                 ->withInput();
         }
 
-        // Crear producto
-        $producto = Producto::create([
-            'nombre' => trim($request->nombre),
-            'descripcion' => trim($request->descripcion),
-            'precio_venta' => $request->precio_venta,
-            'precio_compra' => $request->precio_compra,
-            'stock' => $request->stock,
-            'stock_minimo' => $request->stock_minimo ?? 0,
-            'talla' => $request->talla,
-            'color' => trim($request->color),
-            'estado' => $request->estado,
-            'categoria_id' => $request->categoria_id,
-        ]);
+        // Subida de imagen desde el PC o URL / Base64
+        $imagen = null;
+        if ($request->hasFile('imagen_file')) {
+            $imagen = $request->file('imagen_file')->store('productos', 'public');
+        } elseif ($request->hasFile('imagen')) {
+            $imagen = $request->file('imagen')->store('productos', 'public');
+        } elseif ($request->filled('imagen_url')) {
+            $imagen = trim($request->imagen_url);
+        } elseif ($request->filled('imagen')) {
+            $imagen = trim($request->imagen);
+        }
 
-        // Registrar movimiento de Entrada inicial en el inventario/kardex
-        Inventario::registrarMovimiento($producto->id, 'Entrada', $producto->stock, $producto->stock);
+        DB::transaction(function () use ($request, $imagen) {
+            // Crear producto
+            $producto = Producto::create([
+                'nombre' => trim($request->nombre),
+                'descripcion' => trim($request->descripcion),
+                'precio_venta' => $request->precio_venta,
+                'precio_compra' => $request->precio_compra,
+                'stock' => $request->stock,
+                'stock_minimo' => $request->stock_minimo ?? 0,
+                'talla' => $request->talla,
+                'color' => trim($request->color),
+                'estado' => $request->estado,
+                'categoria_id' => $request->categoria_id,
+                'imagen' => $imagen,
+            ]);
+
+            // Registrar movimiento de Entrada inicial en el inventario/kardex si stock > 0
+            if ($producto->stock > 0) {
+                Inventario::registrarMovimiento($producto->id, 'Entrada', $producto->stock, $producto->stock);
+            }
+        });
 
         return redirect()->route('productos.index')
             ->with('toast', [
@@ -117,6 +137,8 @@ class ProductoController extends Controller
             'color' => ['required', 'string', 'max:30'],
             'estado' => ['required', Rule::in(['Activo', 'Inactivo'])],
             'categoria_id' => ['required', 'exists:categorias,id'],
+            'imagen' => ['nullable'],
+            'imagen_file' => ['nullable', 'image', 'max:6144'],
         ], [
             'nombre.required' => 'El nombre del producto es obligatorio.',
             'categoria_id.required' => 'La categoría es obligatoria.',
@@ -139,25 +161,40 @@ class ProductoController extends Controller
         $newStock = (int)$request->stock;
         $diff = $newStock - $oldStock;
 
-        // Actualizar datos del producto
-        $producto->update([
-            'nombre' => trim($request->nombre),
-            'descripcion' => trim($request->descripcion),
-            'precio_venta' => $request->precio_venta,
-            'precio_compra' => $request->precio_compra,
-            'stock' => $newStock,
-            'stock_minimo' => $request->stock_minimo ?? 0,
-            'talla' => $request->talla,
-            'color' => trim($request->color),
-            'estado' => $request->estado,
-            'categoria_id' => $request->categoria_id,
-        ]);
-
-        // Si el stock ha variado, se registra un movimiento automático en el Kardex
-        if ($diff !== 0) {
-            $tipo = $diff > 0 ? 'Entrada' : 'Salida';
-            Inventario::registrarMovimiento($producto->id, $tipo, $newStock, abs($diff));
+        // Subida de imagen desde el PC o URL / Base64
+        $imagen = $producto->imagen;
+        if ($request->hasFile('imagen_file')) {
+            $imagen = $request->file('imagen_file')->store('productos', 'public');
+        } elseif ($request->hasFile('imagen')) {
+            $imagen = $request->file('imagen')->store('productos', 'public');
+        } elseif ($request->filled('imagen_url')) {
+            $imagen = trim($request->imagen_url);
+        } elseif ($request->has('imagen') && !empty($request->imagen)) {
+            $imagen = trim($request->imagen);
         }
+
+        DB::transaction(function () use ($request, $producto, $imagen, $newStock, $diff) {
+            // Actualizar datos del producto
+            $producto->update([
+                'nombre' => trim($request->nombre),
+                'descripcion' => trim($request->descripcion),
+                'precio_venta' => $request->precio_venta,
+                'precio_compra' => $request->precio_compra,
+                'stock' => $newStock,
+                'stock_minimo' => $request->stock_minimo ?? 0,
+                'talla' => $request->talla,
+                'color' => trim($request->color),
+                'estado' => $request->estado,
+                'categoria_id' => $request->categoria_id,
+                'imagen' => $imagen,
+            ]);
+
+            // Si el stock ha variado, se registra un movimiento automático en el Kardex
+            if ($diff !== 0) {
+                $tipo = $diff > 0 ? 'Entrada' : 'Salida';
+                Inventario::registrarMovimiento($producto->id, $tipo, $newStock, abs($diff));
+            }
+        });
 
         return redirect()->route('productos.index')
             ->with('toast', [
@@ -180,5 +217,37 @@ class ProductoController extends Controller
         ]);
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Eliminar o desactivar un producto según su historial transaccional.
+     */
+    public function destroy(Producto $producto): RedirectResponse
+    {
+        $tieneVentas = $producto->detallesVenta()->exists();
+        $tieneCompras = $producto->detallesCompra()->exists();
+
+        if ($tieneVentas || $tieneCompras) {
+            // Preservar la integridad referencial histórica: se desactiva
+            $producto->update(['estado' => 'Inactivo']);
+
+            return redirect()->route('productos.index')
+                ->with('toast', [
+                    'type' => 'warning',
+                    'text' => 'El producto tiene transacciones de ventas o compras asociadas. Se cambió su estado a Inactivo para preservar la trazabilidad contable.'
+                ]);
+        }
+
+        // Si no tiene historial transaccional, se eliminan movimientos de inventario y el producto
+        DB::transaction(function () use ($producto) {
+            $producto->inventarios()->delete();
+            $producto->delete();
+        });
+
+        return redirect()->route('productos.index')
+            ->with('toast', [
+                'type' => 'success',
+                'text' => 'Producto eliminado correctamente.'
+            ]);
     }
 }

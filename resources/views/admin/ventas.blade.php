@@ -245,6 +245,9 @@
                                 <button onclick="verDetalle({{ $v->id }})" class="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition" title="Ver detalle">
                                     <i class="fas fa-eye text-xs"></i>
                                 </button>
+                                <a href="{{ route('ventas.comprobante', $v->id) }}" target="_blank" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center transition" title="Imprimir Comprobante">
+                                    <i class="fas fa-print text-xs"></i>
+                                </a>
                                 @if ($v->estado === 'Completada')
                                 <button onclick="openDevolucion({{ $v->id }})" class="w-8 h-8 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg flex items-center justify-center transition" title="Solicitar Devolución">
                                     <i class="fas fa-undo-alt text-xs"></i>
@@ -299,12 +302,15 @@
             <div class="relative">
                 <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Cliente (opcional)</label>
                 <div class="flex gap-2">
-                    <input type="text" id="inp-cliente" placeholder="Buscar por nombre o email..." oninput="buscarCliente(this.value)"
+                    <input type="text" id="inp-cliente" placeholder="Buscar por nombre, documento o email..."
+                        onfocus="buscarCliente(this.value)"
+                        oninput="buscarCliente(this.value)"
+                        autocomplete="off"
                         class="flex-1 px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
-                    <button onclick="limpiarCliente()" class="px-4 py-2.5 bg-slate-100 text-slate-500 rounded-xl text-sm font-semibold hover:bg-slate-200 transition">Mostrador</button>
+                    <button onclick="limpiarCliente()" class="px-4 py-2.5 bg-slate-100 text-slate-500 rounded-xl text-sm font-semibold hover:bg-slate-200 transition" title="Registrar como cliente mostrador">Mostrador</button>
                 </div>
                 <!-- Caja de resultados -->
-                <div id="cliente-results" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50"></div>
+                <div id="cliente-results" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 max-h-60 overflow-y-auto"></div>
 
                 <!-- Cliente seleccionado -->
                 <div id="cliente-sel" class="hidden mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 flex items-center justify-between">
@@ -696,35 +702,76 @@
     // ── Buscar y autocompletar Clientes ─────────────────────────────────────────────
     @if($cajaAbierta)
 
-    function buscarCliente(q) {
+    function buscarCliente(q = '') {
         clearTimeout(clienteTimer);
-        if (q.trim().length < 2) {
-            document.getElementById('cliente-results').classList.add('hidden');
-            return;
-        }
+        const box = document.getElementById('cliente-results');
+        const term = (q || '').trim();
 
         clienteTimer = setTimeout(() => {
-            fetch(`${CLIENTES_SEARCH_URL}?q=${encodeURIComponent(q)}`)
+            fetch(`${CLIENTES_SEARCH_URL}?q=${encodeURIComponent(term)}`)
                 .then(r => r.json())
                 .then(data => {
-                    const box = document.getElementById('cliente-results');
                     if (!data.length) {
-                        box.classList.add('hidden');
+                        if (term.length > 0) {
+                            box.innerHTML = `
+                                <div class="p-4 text-center">
+                                    <i class="fas fa-search text-slate-300 text-lg mb-1 block"></i>
+                                    <p class="text-xs font-semibold text-slate-700">Sin coincidencias para "${term.replace(/[<>&"]/g, '')}"</p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Puedes vender como <strong>Mostrador</strong> o registrar al cliente en el menú Clientes.</p>
+                                </div>
+                            `;
+                            box.classList.remove('hidden');
+                        } else {
+                            box.innerHTML = `
+                                <div class="p-3 text-center text-xs text-slate-400">
+                                    No hay clientes registrados en el sistema.
+                                </div>
+                            `;
+                            box.classList.remove('hidden');
+                        }
                         return;
                     }
-                    box.innerHTML = data.map(c => `
-                    <div class="px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0"
-                        onclick="selCliente(${c.id}, '${c.nombre} ${c.apellido}')">
-                        ${c.nombre} ${c.apellido} <span class="text-slate-400 text-xs">(${c.email})</span>
-                    </div>
-                `).join('');
+
+                    const titulo = term.length > 0 ? 'Resultados de búsqueda' : 'Sugerencias de clientes';
+                    box.innerHTML = `
+                        <div class="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${titulo}</span>
+                            <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">${data.length} cliente(s)</span>
+                        </div>
+                    ` + data.map(c => `
+                        <div class="px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center justify-between transition"
+                            onclick="selCliente(${c.id}, '${(c.nombre + ' ' + (c.apellido || '')).replace(/'/g, "\\'")}')">
+                            <div>
+                                <div class="font-semibold text-slate-800 text-xs md:text-sm flex items-center gap-1.5">
+                                    <i class="fas fa-user-circle text-blue-500 text-xs"></i>
+                                    <span>${c.nombre} ${c.apellido || ''}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                    ${c.documento ? `<span><i class="fas fa-id-card text-[10px] mr-1"></i>${c.documento}</span>` : ''}
+                                    ${c.email ? `<span><i class="fas fa-envelope text-[10px] mr-1"></i>${c.email}</span>` : ''}
+                                </div>
+                            </div>
+                            <span class="text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white px-2.5 py-1 rounded-lg border border-blue-200 transition">
+                                Elegir
+                            </span>
+                        </div>
+                    `).join('');
                     box.classList.remove('hidden');
                 })
                 .catch(() => {
-                    document.getElementById('cliente-results').classList.add('hidden');
+                    box.classList.add('hidden');
                 });
-        }, 300);
+        }, 150);
     }
+
+    // Cerrar sugerencias al hacer clic fuera del campo
+    document.addEventListener('click', function(e) {
+        const box = document.getElementById('cliente-results');
+        const inp = document.getElementById('inp-cliente');
+        if (box && !box.contains(e.target) && e.target !== inp) {
+            box.classList.add('hidden');
+        }
+    });
 
     function selCliente(id, nombreCompleto) {
         clienteId = id;
@@ -841,13 +888,20 @@
             .then(d => {
                 if (d.ok) {
                     closeModal();
+                    const saleId = d.id_venta || d.id;
                     Swal.fire({
                         icon: 'success',
                         title: '¡Venta Registrada!',
                         text: d.msg,
+                        showCancelButton: true,
                         confirmButtonColor: '#2563eb',
-                        confirmButtonText: 'Excelente'
-                    }).then(() => {
+                        cancelButtonColor: '#64748b',
+                        confirmButtonText: '<i class="fas fa-print mr-1"></i> Imprimir Comprobante',
+                        cancelButtonText: 'Aceptar'
+                    }).then((result) => {
+                        if (result.isConfirmed && saleId) {
+                            window.open(`${BASE_URL}/${saleId}/comprobante`, '_blank');
+                        }
                         location.reload();
                     });
                 } else {
@@ -916,9 +970,14 @@
                         `).join('')}
                     </tbody>
                 </table>
-                <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
+                <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl mb-4">
                     <span class="font-semibold text-slate-700">Total Venta</span>
                     <span class="text-xl font-bold text-blue-600">${total}</span>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <a href="${BASE_URL}/${id}/comprobante" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition shadow">
+                        <i class="fas fa-print"></i> Imprimir Comprobante
+                    </a>
                 </div>
             `;
                 document.getElementById('modal-det').classList.remove('hidden');

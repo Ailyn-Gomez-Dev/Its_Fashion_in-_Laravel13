@@ -125,94 +125,211 @@
     </div>
 
     @if ($caja)
-    <!-- KPIs de la Caja Activa -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-play text-sm"></i>
-                </div>
-                <div>
-                    <p class="text-lg font-bold text-slate-800">${{ number_format($caja->saldo_inicial, 2) }}</p>
-                    <p class="text-xs text-slate-500">Saldo inicial</p>
-                </div>
-            </div>
-        </div>
-        <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-arrow-down text-sm"></i>
-                </div>
-                <div>
-                    <p class="text-lg font-bold text-slate-800">${{ number_format($caja->total_ingresos ?? 0, 2) }}</p>
-                    <p class="text-xs text-slate-500">Ingresos (+)</p>
+    <!-- KPIs del Arqueo Físico (Gaveta de Efectivo) -->
+    <div class="mb-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+            <i class="fas fa-money-bill-wave text-blue-600"></i> Arqueo Físico de Gaveta (Solo Efectivo)
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-play text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-slate-800">${{ number_format($caja->saldo_inicial, 2) }}</p>
+                        <p class="text-xs text-slate-500">Saldo inicial</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-red-100 text-red-700 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-arrow-up text-sm"></i>
-                </div>
-                <div>
-                    <p class="text-lg font-bold text-slate-800">${{ number_format($caja->total_egresos ?? 0, 2) }}</p>
-                    <p class="text-xs text-slate-500">Egresos (-)</p>
+            <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-arrow-down text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-slate-800">${{ number_format($caja->total_ingresos ?? 0, 2) }}</p>
+                        <p class="text-xs text-slate-500">Ingresos efectivo (+)</p>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-calculator text-sm"></i>
+            <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-red-100 text-red-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-arrow-up text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-slate-800">${{ number_format($caja->total_egresos ?? 0, 2) }}</p>
+                        <p class="text-xs text-slate-500">Egresos efectivo (-)</p>
+                    </div>
                 </div>
-                <div>
-                    <p class="text-lg font-bold text-slate-800">${{ number_format($saldo_teorico, 2) }}</p>
-                    <p class="text-xs text-slate-500">Saldo teórico</p>
+            </div>
+            <div class="bg-white border border-slate-100 rounded-2xl p-5 stat-card shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-calculator text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-slate-800">${{ number_format($saldo_teorico, 2) }}</p>
+                        <p class="text-xs text-slate-500">Saldo teórico gaveta</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tabla de Movimientos del Turno -->
-    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm" style="box-shadow:0 2px 16px rgba(0,0,0,.04);">
-        <div class="px-6 py-5 border-b border-slate-100">
-            <h3 class="font-bold text-slate-800">Movimientos del turno</h3>
-            <p class="text-xs text-slate-500 mt-0.5">{{ today()->format('d/m/Y') }}</p>
+    <!-- Resumen de Canales de Pago del Turno -->
+    <div class="bg-gradient-to-r from-slate-50 to-blue-50/40 border border-slate-200/80 rounded-2xl p-5 mb-6 shadow-sm">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <i class="fas fa-receipt text-indigo-600"></i> Ventas y Cobros Registrados en este Turno
+            </h3>
+            <span class="text-xs text-slate-500">
+                Total transacciones: <b>{{ $ventas_turno->count() }}</b> venta(s)
+            </span>
         </div>
-        @if (empty($movimientos) || count($movimientos) === 0)
-        <div class="py-16 text-center text-slate-400">
-            <i class="fas fa-exchange-alt text-3xl mb-3 block opacity-20"></i>
-            <p class="text-sm">No hay movimientos en este turno de caja aún</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">Total Facturado Turno</p>
+                    <p class="text-xl font-black text-slate-900 mt-0.5">${{ number_format($total_facturado_turno, 2) }}</p>
+                </div>
+                <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-sm"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">Cobrado en Efectivo (Gaveta)</p>
+                    <p class="text-xl font-bold text-emerald-600 mt-0.5">${{ number_format($total_ventas_efectivo, 2) }}</p>
+                </div>
+                <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <i class="fas fa-money-bill-wave text-sm"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-slate-100 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">Cobrado por Transferencia (Banco)</p>
+                    <p class="text-xl font-bold text-blue-600 mt-0.5">${{ number_format($total_ventas_transferencia, 2) }}</p>
+                </div>
+                <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <i class="fas fa-university text-sm"></i>
+                </div>
+            </div>
         </div>
-        @else
-        <div class="overflow-x-auto">
-            <table class="w-full whitespace-nowrap">
-                <thead>
-                    <tr>
-                        @foreach (['Hora', 'Tipo', 'Concepto', 'Monto'] as $h)
-                        <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-100">{{ $h }}</th>
+
+        <div class="mt-3.5 p-3 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-800 flex items-start gap-2.5">
+            <i class="fas fa-info-circle text-blue-600 mt-0.5 flex-shrink-0"></i>
+            <div>
+                <b>¿Cómo se calcula el Arqueo?</b> Las ventas en <b>Efectivo</b> ingresan automáticamente a la gaveta física y aumentan el <i>Saldo Teórico</i>. Las ventas por <b>Transferencia Bancaria</b> (Nequi, Daviplata, Bancolombia) se acreditan en la cuenta de banco y <u>no</u> suman al conteo físico de billetes para evitar descuadres o falsos faltantes en el cierre de caja.
+            </div>
+        </div>
+    </div>
+
+    <!-- Pestañas de Detalle: Movimientos de Gaveta / Ventas del Turno -->
+    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm mb-6" style="box-shadow:0 2px 16px rgba(0,0,0,.04);">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="cambiarTabCaja('movimientos')" id="tab-btn-movimientos"
+                    class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow-sm">
+                    <i class="fas fa-exchange-alt"></i> Movimientos de Efectivo ({{ count($movimientos) }})
+                </button>
+                <button type="button" onclick="cambiarTabCaja('ventas')" id="tab-btn-ventas"
+                    class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    <i class="fas fa-shopping-bag"></i> Ventas del Turno ({{ $ventas_turno->count() }})
+                </button>
+            </div>
+            <p class="text-xs text-slate-500">{{ today()->format('d/m/Y') }}</p>
+        </div>
+
+        <!-- Panel 1: Movimientos de Efectivo -->
+        <div id="tab-panel-movimientos">
+            @if (empty($movimientos) || count($movimientos) === 0)
+            <div class="py-14 text-center text-slate-400">
+                <i class="fas fa-exchange-alt text-3xl mb-3 block opacity-20"></i>
+                <p class="text-sm">No hay movimientos manuales ni ingresos de efectivo registrados en este turno aún</p>
+                <p class="text-xs text-slate-400 mt-1">Usa el botón <b>"Movimiento Manual"</b> para registrar ingresos o egresos de efectivo.</p>
+            </div>
+            @else
+            <div class="overflow-x-auto">
+                <table class="w-full whitespace-nowrap">
+                    <thead>
+                        <tr>
+                            @foreach (['Hora', 'Tipo', 'Concepto', 'Monto'] as $h)
+                            <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-100">{{ $h }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($movimientos as $m)
+                        <tr class="trow text-slate-700">
+                            <td class="px-6 py-4 border-b border-slate-50">
+                                <span class="font-mono text-xs text-slate-500">{{ $m->fecha ? $m->fecha->format('H:i') : '' }}</span>
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50">
+                                <span class="badge {{ $m->tipo === 'Ingreso' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600' }}">{{ $m->tipo }}</span>
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50 text-sm text-slate-700">{{ $m->concepto }}</td>
+                            <td class="px-6 py-4 border-b border-slate-50 font-bold {{ $m->tipo === 'Ingreso' ? 'text-emerald-600' : 'text-red-600' }}">
+                                {{ $m->tipo === 'Ingreso' ? '+' : '-' }}${{ number_format($m->monto, 2) }}
+                            </td>
+                        </tr>
                         @endforeach
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($movimientos as $m)
-                    <tr class="trow text-slate-700">
-                        <td class="px-6 py-4 border-b border-slate-50">
-                            <span class="font-mono text-xs text-slate-500">{{ $m->fecha ? $m->fecha->format('H:i') : '' }}</span>
-                        </td>
-                        <td class="px-6 py-4 border-b border-slate-50">
-                            <span class="badge {{ $m->tipo === 'Ingreso' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600' }}">{{ $m->tipo }}</span>
-                        </td>
-                        <td class="px-6 py-4 border-b border-slate-50 text-sm text-slate-700">{{ $m->concepto }}</td>
-                        <td class="px-6 py-4 border-b border-slate-50 font-bold {{ $m->tipo === 'Ingreso' ? 'text-emerald-600' : 'text-red-600' }}">
-                            {{ $m->tipo === 'Ingreso' ? '+' : '-' }}${{ number_format($m->monto, 2) }}
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
+            @endif
         </div>
-        @endif
+
+        <!-- Panel 2: Ventas del Turno -->
+        <div id="tab-panel-ventas" class="hidden">
+            @if ($ventas_turno->isEmpty())
+            <div class="py-14 text-center text-slate-400">
+                <i class="fas fa-shopping-bag text-3xl mb-3 block opacity-20"></i>
+                <p class="text-sm">No se han registrado ventas durante este turno de caja aún</p>
+            </div>
+            @else
+            <div class="overflow-x-auto">
+                <table class="w-full whitespace-nowrap">
+                    <thead>
+                        <tr>
+                            @foreach (['# Venta', 'Hora', 'Cliente', 'Método de Pago', 'Responsable', 'Total'] as $h)
+                            <th class="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-100">{{ $h }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($ventas_turno as $v)
+                        <tr class="trow text-slate-700">
+                            <td class="px-6 py-4 border-b border-slate-50 font-mono text-xs font-bold text-slate-900">
+                                #{{ $v->id }}
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50 font-mono text-xs text-slate-500">
+                                {{ $v->fecha ? $v->fecha->format('H:i') : '' }}
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50 text-sm font-medium text-slate-800">
+                                {{ $v->cliente->nombre ?? 'Consumidor final' }} {{ $v->cliente->apellido ?? '' }}
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50">
+                                <span class="badge {{ $v->metodo_pago === 'Efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700' }}">
+                                    <i class="fas {{ $v->metodo_pago === 'Efectivo' ? 'fa-money-bill-wave' : 'fa-university' }} mr-1 text-xs"></i>
+                                    {{ $v->metodo_pago }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50 text-xs text-slate-500">
+                                {{ $v->usuario->nombre ?? '—' }}
+                            </td>
+                            <td class="px-6 py-4 border-b border-slate-50 font-bold text-slate-900">
+                                ${{ number_format($v->total, 2) }}
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
+        </div>
     </div>
     @else
     <!-- Caja Cerrada Mensaje Central -->
@@ -258,6 +375,27 @@
     const SALDO_TEORICO = parseFloat("{{ $saldo_teorico }}");
     const ID_CAJA = parseInt("{{ $caja->id ?? 0 }}");
     const RESPONSABLE = "{{ Auth::user()->nombre }} {{ Auth::user()->apellido }}";
+
+    function cambiarTabCaja(tab) {
+        const btnMov = document.getElementById('tab-btn-movimientos');
+        const btnVen = document.getElementById('tab-btn-ventas');
+        const pnlMov = document.getElementById('tab-panel-movimientos');
+        const pnlVen = document.getElementById('tab-panel-ventas');
+
+        if (!btnMov || !btnVen || !pnlMov || !pnlVen) return;
+
+        if (tab === 'movimientos') {
+            btnMov.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow-sm';
+            btnVen.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+            pnlMov.classList.remove('hidden');
+            pnlVen.classList.add('hidden');
+        } else {
+            btnVen.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow-sm';
+            btnMov.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+            pnlVen.classList.remove('hidden');
+            pnlMov.classList.add('hidden');
+        }
+    }
 
     function openModal(type) {
         document.getElementById('modal').classList.remove('hidden');

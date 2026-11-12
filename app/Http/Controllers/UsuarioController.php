@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -51,22 +52,26 @@ class UsuarioController extends Controller
         $request->validate([
             'nombre' => ['required', 'string', 'max:100'],
             'apellido' => ['required', 'string', 'max:100'],
+            'documento' => ['nullable', 'string', 'max:20', 'unique:users,documento'],
             'username' => ['required', 'string', 'max:50', 'unique:users,username'],
             'email' => ['required', 'string', 'email', 'max:100', 'unique:users,email'],
-            'telefono' => ['nullable', 'string', 'max:15'],
+            'telefono' => ['required', 'string', 'max:15'],
             'password' => ['required', Password::min(8)->mixedCase()->numbers()],
             'estado' => ['required', Rule::in(['Activo', 'Inactivo'])],
             'rol_id' => ['required', Rule::in($rolesPermitidos)],
+            'puede_operar_caja' => ['nullable', 'boolean'],
         ]);
 
         User::create([ // esta funcion es para guardar los datos del nuevo usuario en la tabla usuarios
             'nombre' => $request->nombre,
             'apellido' => $request->apellido,
+            'documento' => $request->filled('documento') ? trim($request->documento) : null,
             'username' => $request->username,
             'email' => $request->email,
             'telefono' => $request->telefono,
             'password' => Hash::make($request->password), //se hashea la contraseña
             'rol_id' => $request->rol_id, //se asigna el rol
+            'puede_operar_caja' => $request->boolean('puede_operar_caja', true),
             'estado' => $request->estado, //se asigna el estado
         ]);
 
@@ -85,21 +90,53 @@ class UsuarioController extends Controller
         $request->validate([
             'nombre' => ['required', 'string', 'max:100'], //se valida el nombre
             'apellido' => ['required', 'string', 'max:100'],
+            'documento' => ['nullable', 'string', 'max:20', Rule::unique('users', 'documento')->ignore($usuario->id)],
             'username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($usuario->id)],
             'email' => ['required', 'string', 'email', 'max:100', Rule::unique('users', 'email')->ignore($usuario->id)],
-            'telefono' => ['nullable', 'string', 'max:15'],
+            'telefono' => ['required', 'string', 'max:15'],
             'password' => ['nullable', Password::min(8)->mixedCase()->numbers()],
             'estado' => ['required', Rule::in(['Activo', 'Inactivo'])],
             'rol_id' => ['required', Rule::in($rolesPermitidos)],
+            'puede_operar_caja' => ['nullable', 'boolean'],
         ]);
+
+        // Protección contra auto-bloqueo y auto-degradación
+        $esUsuarioActual = $usuario->id === Auth::id();
+        if ($esUsuarioActual && $request->estado === 'Inactivo') {
+            return redirect()->back()
+                ->withErrors(['estado' => 'No puedes desactivar tu propia cuenta mientras estés en sesión.'])
+                ->withInput();
+        }
+
+        if ($esUsuarioActual && (int)$request->rol_id !== (int)$usuario->rol_id) {
+            return redirect()->back()
+                ->withErrors(['rol_id' => 'No puedes cambiar tu propio rol desde aquí.'])
+                ->withInput();
+        }
+
+        // Protección contra dejar el sistema sin ningún administrador activo
+        $esAdmin = (int)$usuario->rol_id === 1;
+        $cambiaAInactivo = $request->estado === 'Inactivo';
+        $degradaRol = (int)$request->rol_id !== 1;
+
+        if ($esAdmin && ($cambiaAInactivo || $degradaRol)) {
+            $totalAdminsActivos = User::where('rol_id', 1)->where('estado', 'Activo')->count();
+            if ($totalAdminsActivos <= 1) {
+                return redirect()->back()
+                    ->withErrors(['estado' => 'No se puede desactivar ni degradar al único administrador activo del sistema.'])
+                    ->withInput();
+            }
+        }
 
         $usuario->nombre = $request->nombre; //se actualiza el nombre
         $usuario->apellido = $request->apellido; //se actualiza el apellido
+        $usuario->documento = $request->filled('documento') ? trim($request->documento) : null;
         $usuario->username = $request->username; //se actualiza el username
         $usuario->email = $request->email; //se actualiza el email
         $usuario->telefono = $request->telefono; //se actualiza el telefono
         $usuario->estado = $request->estado; //se actualiza el estado
         $usuario->rol_id = $request->rol_id; //se actualiza el rol
+        $usuario->puede_operar_caja = $request->boolean('puede_operar_caja');
 
         if ($request->filled('password')) { //se hashea la contraseña si se envia un valor nuevo
             $usuario->password = Hash::make($request->password);
@@ -118,6 +155,23 @@ class UsuarioController extends Controller
         $request->validate([
             'estado' => ['required', Rule::in(['Activo', 'Inactivo'])], //se valida el estado
         ]);
+
+        if ($usuario->id === Auth::id() && $request->estado === 'Inactivo') {
+            return response()->json([
+                'ok' => false,
+                'message' => 'No puedes desactivar tu propia cuenta.'
+            ], 403);
+        }
+
+        if ((int)$usuario->rol_id === 1 && $request->estado === 'Inactivo') {
+            $totalAdminsActivos = User::where('rol_id', 1)->where('estado', 'Activo')->count();
+            if ($totalAdminsActivos <= 1) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'No se puede desactivar al único administrador activo del sistema.'
+                ], 422);
+            }
+        }
 
         $usuario->update(['estado' => $request->estado]); //se actualiza el estado del usuario
 

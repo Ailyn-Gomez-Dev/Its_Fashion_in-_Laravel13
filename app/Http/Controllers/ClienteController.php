@@ -65,19 +65,19 @@ class ClienteController extends Controller
      */
     public function compras(User $cliente): JsonResponse
     {
-        if ($cliente->rol_id !== 3) {
+        $authUser = auth()->user();
+        if ($cliente->rol_id !== 3 || ($authUser->rol_id === 3 && $authUser->id !== $cliente->id)) {
             return response()->json(['ok' => false, 'msg' => 'No autorizado.'], 403);
         }
 
-        // Obtener las ventas asociadas al cliente
-        $compras = Venta::where('cliente_id', $cliente->id)
+        // Obtener las ventas asociadas al cliente con eager loading para evitar consultas N+1
+        $compras = Venta::with('detalles.producto')
+            ->where('cliente_id', $cliente->id)
             ->orderBy('fecha', 'desc')
             ->get()
             ->map(function ($c) {
-                // Desglosar los productos de la venta en un string
-                $productosStr = DetalleVenta::where('venta_id', $c->id)
-                    ->with('producto')
-                    ->get()
+                // Desglosar los productos de la venta en memoria
+                $productosStr = $c->detalles
                     ->map(fn($d) => ($d->producto->nombre ?? 'Producto Eliminado') . ' × ' . $d->cantidad)
                     ->implode(', ');
 
@@ -99,7 +99,8 @@ class ClienteController extends Controller
      */
     public function devoluciones(User $cliente): JsonResponse
     {
-        if ($cliente->rol_id !== 3) {
+        $authUser = auth()->user();
+        if ($cliente->rol_id !== 3 || ($authUser->rol_id === 3 && $authUser->id !== $cliente->id)) {
             return response()->json(['ok' => false, 'msg' => 'No autorizado.'], 403);
         }
 

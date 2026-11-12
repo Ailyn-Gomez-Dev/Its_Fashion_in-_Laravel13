@@ -189,37 +189,62 @@
         <form id="form-prov" method="POST" action="" class="p-7 overflow-y-auto space-y-4">
             @csrf
             <input type="hidden" name="_method" id="form-method" value="">
+            <input type="hidden" name="proveedor_id" id="prov-id" value="{{ old('proveedor_id') }}">
 
             <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2">
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Nombre *</label>
                     <input type="text" name="nombre" id="prov-nombre" required placeholder="Nombre del proveedor"
-                        class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                        value="{{ old('nombre') }}"
+                        class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('nombre') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    @error('nombre')
+                        <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Contacto *</label>
                     <input type="text" name="contacto" id="prov-contacto" required placeholder="Nombre del contacto"
-                        class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                        value="{{ old('contacto') }}"
+                        class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('contacto') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    @error('contacto')
+                        <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Documento</label>
                     <input type="text" name="documento" id="prov-doc" placeholder="NIT o cédula"
-                        class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                        value="{{ old('documento') }}"
+                        class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('documento') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    @error('documento')
+                        <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Teléfono *</label>
                     <input type="text" name="telefono" id="prov-tel" required placeholder="Teléfono"
-                        class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                        value="{{ old('telefono') }}"
+                        class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('telefono') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    @error('telefono')
+                        <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Email</label>
                     <input type="email" name="email" id="prov-email" placeholder="correo@proveedor.com"
-                        class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                        value="{{ old('email') }}"
+                        class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('email') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    @error('email')
+                        <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
                 <div class="col-span-2">
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Dirección</label>
                     <input type="text" name="direccion" id="prov-dir" placeholder="Dirección"
-                        class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                        value="{{ old('direccion') }}"
+                        class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('direccion') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    @error('direccion')
+                        <p class="text-xs text-red-500 mt-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
             </div>
             <div class="flex gap-3 pt-2">
@@ -344,23 +369,31 @@
         const modal = document.getElementById('modal-prov');
         const form = document.getElementById('form-prov');
         const methodInput = document.getElementById('form-method');
+        const provIdInput = document.getElementById('prov-id');
         const title = document.getElementById('modal-title');
         const btnText = document.getElementById('btn-text');
 
         form.reset();
+        document.querySelectorAll('#form-prov input').forEach(input => {
+            input.classList.remove('border-red-500');
+            input.classList.add('border-slate-200');
+        });
 
         if (mode === 'create') {
             form.action = STORE_URL;
             methodInput.value = 'POST';
+            if (provIdInput) provIdInput.value = '';
             title.textContent = 'Nuevo proveedor';
             btnText.textContent = 'Guardar';
             modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('prov-nombre').focus(), 50);
         } else if (mode === 'edit' && data) {
             form.action = `${BASE_URL}/${data.id}`;
             methodInput.value = 'PUT';
+            if (provIdInput) provIdInput.value = data.id;
             document.getElementById('prov-nombre').value = data.nombre;
             document.getElementById('prov-contacto').value = data.contacto;
-            document.getElementById('prov-doc').value = data.documento;
+            document.getElementById('prov-doc').value = data.documento || '';
             document.getElementById('prov-tel').value = data.telefono;
             document.getElementById('prov-email').value = data.email || '';
             document.getElementById('prov-dir').value = data.direccion || '';
@@ -368,6 +401,7 @@
             title.textContent = 'Editar proveedor';
             btnText.textContent = 'Actualizar';
             modal.classList.remove('hidden');
+            setTimeout(() => document.getElementById('prov-nombre').focus(), 50);
         }
     }
 
@@ -387,7 +421,6 @@
             el.style.boxShadow = '0 0 0 3px rgba(59,130,246,.15)';
         });
         el.addEventListener('blur', () => {
-            el.style.borderColor = '';
             el.style.boxShadow = '';
         });
     });
@@ -432,16 +465,46 @@
     });
     @endif
 
-    // Notificaciones de errores de validación de backend
+    // Notificaciones de errores de validación de backend y reapertura del modal
     @if($errors->any())
     document.addEventListener('DOMContentLoaded', () => {
         Swal.fire({
             icon: 'error',
-            title: 'Error de Validación',
-            html: `{!! implode('<br>', $errors->all()) !!}`,
+            title: 'No se pudo guardar el proveedor',
+            html: @json(implode('<br>', array_map('htmlspecialchars', $errors->all()))),
             confirmButtonColor: '#2563eb',
-            confirmButtonText: 'Entendido'
+            confirmButtonText: 'Corregir'
         });
+
+        const modal = document.getElementById('modal-prov');
+        const form = document.getElementById('form-prov');
+        const methodInput = document.getElementById('form-method');
+        const provIdInput = document.getElementById('prov-id');
+        const title = document.getElementById('modal-title');
+        const btnText = document.getElementById('btn-text');
+
+        @if(old('_method') === 'PUT' && old('proveedor_id'))
+            title.textContent = 'Editar proveedor';
+            btnText.textContent = 'Actualizar';
+            methodInput.value = 'PUT';
+            form.action = `${BASE_URL}/{{ old('proveedor_id') }}`;
+            if (provIdInput) provIdInput.value = '{{ old('proveedor_id') }}';
+        @else
+            title.textContent = 'Nuevo proveedor';
+            btnText.textContent = 'Guardar';
+            methodInput.value = 'POST';
+            form.action = STORE_URL;
+            if (provIdInput) provIdInput.value = '';
+        @endif
+
+        document.getElementById('prov-nombre').value = @json(old('nombre', ''));
+        document.getElementById('prov-contacto').value = @json(old('contacto', ''));
+        document.getElementById('prov-doc').value = @json(old('documento', ''));
+        document.getElementById('prov-tel').value = @json(old('telefono', ''));
+        document.getElementById('prov-email').value = @json(old('email', ''));
+        document.getElementById('prov-dir').value = @json(old('direccion', ''));
+
+        modal.classList.remove('hidden');
     });
     @endif
 </script>

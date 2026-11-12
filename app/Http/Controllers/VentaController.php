@@ -65,6 +65,15 @@ class VentaController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        /** @var User $user */
+        $user = Auth::user();
+        if ((int)$user->rol_id === 3) {
+            return response()->json([
+                'ok' => false,
+                'msg' => 'Acceso denegado. Los clientes no están autorizados para registrar ventas de punto de venta.'
+            ], 403);
+        }
+
         $request->validate([
             'cliente_id' => ['nullable', 'exists:users,id'],
             'metodo_pago' => ['required', 'in:Efectivo,Transferencia bancaria'],
@@ -94,9 +103,9 @@ class VentaController extends Controller
 
         try {
             $idVenta = DB::transaction(function () use ($request, $items) {
-                // 1. Verificar stock disponible para todos los ítems antes de proceder
+                // 1. Verificar stock disponible con bloqueo pesimista antes de proceder
                 foreach ($items as $item) {
-                    $producto = Producto::find($item['id_producto']);
+                    $producto = Producto::lockForUpdate()->find($item['id_producto']);
                     if (!$producto || $producto->estado !== 'Activo') {
                         throw new \Exception("El producto '{$item['nombre']}' ya no está disponible.");
                     }
@@ -105,8 +114,20 @@ class VentaController extends Controller
                     }
                 }
 
-                // 2. Calcular total de la venta
-                $total = array_sum(array_map(fn($item) => $item['cantidad'] * $item['precio_unitario'], $items));
+                // 2. Calcular total de la venta garantizando precios oficiales de catálogo
+                $total = 0;
+                $itemsProcesados = [];
+                foreach ($items as $item) {
+                    $producto = Producto::lockForUpdate()->find($item['id_producto']);
+                    $cantidad = max(1, (int) $item['cantidad']);
+                    $precioOficial = (float) $producto->precio_venta;
+                    $total += ($cantidad * $precioOficial);
+                    $itemsProcesados[] = [
+                        'producto' => $producto,
+                        'cantidad' => $cantidad,
+                        'precio_unitario' => $precioOficial,
+                    ];
+                }
 
                 // 3. Registrar venta
                 $venta = Venta::create([
@@ -119,18 +140,21 @@ class VentaController extends Controller
                 ]);
 
                 // 4. Registrar detalles y actualizar stock
-                foreach ($items as $item) {
+                foreach ($itemsProcesados as $itemData) {
+                    $producto = $itemData['producto'];
+                    $cantidad = $itemData['cantidad'];
+                    $precioUnitario = $itemData['precio_unitario'];
+
                     // Guardar detalle_ventas
                     DetalleVenta::create([
                         'venta_id' => $venta->id,
-                        'producto_id' => $item['id_producto'],
-                        'cantidad' => $item['cantidad'],
-                        'precio_unitario' => $item['precio_unitario'],
+                        'producto_id' => $producto->id,
+                        'cantidad' => $cantidad,
+                        'precio_unitario' => $precioUnitario,
                     ]);
 
                     // Descontar stock del producto
-                    $producto = Producto::lockForUpdate()->find($item['id_producto']);
-                    $nuevoStock = $producto->stock - $item['cantidad'];
+                    $nuevoStock = $producto->stock - $cantidad;
                     $producto->update(['stock' => $nuevoStock]);
 
                     // NOTIFICACIÓN: Stock crítico
@@ -152,33 +176,35 @@ class VentaController extends Controller
                     }
 
                     // Registrar movimiento de Salida en el Kardex (inventario)
-                    Inventario::registrarMovimiento($producto->id, 'Salida', $nuevoStock, $item['cantidad']);
+                    Inventario::registrarMovimiento($producto->id, 'Salida', $nuevoStock, $cantidad);
                 }
 
-                // 5. Registrar en caja activa si existe una abierta
-                $caja = DB::table('cajas')
-                    ->where('estado', 'Abierta')
-                    ->first();
+                // 5. Registrar en caja activa ÚNICAMENTE si el pago fue en Efectivo (para evitar descuadre en arqueo físico)
+                if ($request->metodo_pago === 'Efectivo') {
+                    $caja = DB::table('cajas')
+                        ->where('estado', 'Abierta')
+                        ->first();
 
-                if ($caja) {
-                    // Registrar el movimiento de ingreso de caja
-                    DB::table('movimientos_caja')->insert([
-                        'caja_id' => $caja->id,
-                        'tipo' => 'Ingreso',
-                        'monto' => $total,
-                        'concepto' => "Venta #{$venta->id} ({$request->metodo_pago})",
-                        'fecha' => now(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-
-                    // Actualizar el total_ingresos de la caja activa
-                    DB::table('cajas')
-                        ->where('id', $caja->id)
-                        ->update([
-                            'total_ingresos' => DB::raw("COALESCE(total_ingresos, 0) + {$total}"),
+                    if ($caja) {
+                        // Registrar el movimiento de ingreso de caja
+                        DB::table('movimientos_caja')->insert([
+                            'caja_id' => $caja->id,
+                            'tipo' => 'Ingreso',
+                            'monto' => $total,
+                            'concepto' => "Venta #{$venta->id} (Efectivo)",
+                            'fecha' => now(),
+                            'created_at' => now(),
                             'updated_at' => now(),
                         ]);
+
+                        // Actualizar el total_ingresos de la caja activa
+                        DB::table('cajas')
+                            ->where('id', $caja->id)
+                            ->update([
+                                'total_ingresos' => DB::raw("COALESCE(total_ingresos, 0) + {$total}"),
+                                'updated_at' => now(),
+                            ]);
+                    }
                 }
 
                 return $venta->id;
@@ -203,6 +229,12 @@ class VentaController extends Controller
      */
     public function show(Venta $venta): JsonResponse
     {
+        /** @var User $user */
+        $user = Auth::user();
+        if ((int)$user->rol_id === 3 && (int)$venta->cliente_id !== (int)$user->id) {
+            return response()->json(['error' => 'No autorizado para ver esta venta.'], 403);
+        }
+
         $detalles = DetalleVenta::with('producto')
             ->where('venta_id', $venta->id)
             ->get()
@@ -227,20 +259,39 @@ class VentaController extends Controller
     public function buscarCliente(Request $request): JsonResponse
     {
         $q = trim($request->query('q', ''));
-        if (strlen($q) < 2) {
-            return response()->json([]);
+
+        $query = User::where('rol_id', 3)->where('estado', 'Activo');
+
+        if (strlen($q) >= 1) {
+            $query->where(function($sub) use ($q) {
+                $sub->where('nombre', 'like', "%{$q}%")
+                    ->orWhere('apellido', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%")
+                    ->orWhere('documento', 'like', "%{$q}%")
+                    ->orWhere('telefono', 'like', "%{$q}%");
+            });
         }
 
-        $clientes = User::where('rol_id', 3)
-            ->where('estado', 'Activo')
-            ->where(function($query) use ($q) {
-                $query->where('nombre', 'like', "%{$q}%")
-                      ->orWhere('apellido', 'like', "%{$q}%")
-                      ->orWhere('email', 'like', "%{$q}%");
-            })
+        $clientes = $query->orderBy('nombre', 'asc')
             ->limit(10)
-            ->get(['id', 'nombre', 'apellido', 'email']);
+            ->get(['id', 'nombre', 'apellido', 'email', 'documento', 'telefono']);
 
         return response()->json($clientes);
+    }
+
+    /**
+     * Genera el comprobante de venta imprimible en formato ticket POS.
+     */
+    public function comprobante(Venta $venta): View
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        if ((int)$user->rol_id === 3 && (int)$venta->cliente_id !== (int)$user->id) {
+            abort(403, 'No tienes autorización para consultar este comprobante.');
+        }
+
+        $venta->load(['cliente', 'usuario', 'detalles.producto']);
+
+        return view('ventas.comprobante', compact('venta'));
     }
 }

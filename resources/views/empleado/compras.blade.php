@@ -1,4 +1,4 @@
-@extends('layouts.Sidebarempleado')
+@extends('layouts.sidebarempleado')
 
 @section('titulo', 'Abastecimiento (Empleado)')
 

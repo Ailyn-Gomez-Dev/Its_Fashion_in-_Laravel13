@@ -5,6 +5,7 @@ namespace App\Http\Requests\Auth;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +28,8 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => ['required', 'string'],
+            'username' => ['required_without:email', 'nullable', 'string'],
+            'email'    => ['required_without:username', 'nullable', 'string'],
             'password' => ['required', 'string'],
         ];
     }
@@ -44,31 +46,29 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $login = $this->input('username');
+        $login = (string) ($this->input('username') ?: $this->input('email'));
+        $password = (string) $this->input('password');
 
         // Si lo que escribió parece un correo, busca por email; si no, por username.
         $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
-        // 1. Intentar buscar al usuario primero para verificar su estado
-        $user = \App\Models\User::where($field, $login)->first();
-
-        if ($user && $user->estado === 'Inactivo') {
-            RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'username' => 'Esta cuenta se encuentra inactiva. Por favor, ponte en contacto con el administrador para reactivar tu acceso.',
-            ]);
-        }
-
-        // 2. Si el usuario existe y no está inactivo, procedemos con las credenciales normales
+        // 1. Intentar autenticar credenciales activas
         $credentials = [
             $field => $login,
-            'password' => $this->input('password'),
+            'password' => $password,
             'estado' => 'Activo',
         ];
 
         if (! Auth::attempt($credentials, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
+
+            // Solo si la contraseña es correcta pero la cuenta está inactiva, se informa al usuario legítimo
+            $user = \App\Models\User::where($field, $login)->first();
+            if ($user && $user->estado === 'Inactivo' && Hash::check($password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'username' => 'Esta cuenta se encuentra inactiva. Por favor, ponte en contacto con el administrador para reactivar tu acceso.',
+                ]);
+            }
 
             throw ValidationException::withMessages([
                 'username' => trans('auth.failed'),

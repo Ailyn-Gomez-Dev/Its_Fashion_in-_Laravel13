@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Caja;
 use App\Models\MovimientoCaja;
+use App\Models\Venta;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -12,33 +13,69 @@ use Illuminate\View\View;
 
 class CajaController extends Controller
 {
+    private function validarPermisoCaja(): void
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        if ($user && (int)$user->rol_id === 2 && !$user->puede_operar_caja) {
+            abort(403, 'No cuentas con autorización para operar la caja registradora.');
+        }
+    }
+
     /**
      * Muestra la caja activa, movimientos y saldo teórico.
      */
     public function index(): View
     {
+        $this->validarPermisoCaja();
+
         $caja = Caja::where('estado', 'Abierta')
             ->with('usuario')
             ->first();
 
         $movimientos = [];
         $saldo_teorico = 0;
+        $ventas_turno = collect();
+        $total_ventas_efectivo = 0;
+        $total_ventas_transferencia = 0;
+        $total_facturado_turno = 0;
 
         if ($caja) {
             $movimientos = MovimientoCaja::where('caja_id', $caja->id)
-                ->orderBy('fecha', 'asc')
+                ->orderBy('fecha', 'desc')
                 ->get();
 
-            $saldo_teorico = $caja->saldo_inicial + ($caja->total_ingresos ?? 0) - ($caja->total_egresos ?? 0);
+            $saldo_teorico = (float)$caja->saldo_inicial + (float)($caja->total_ingresos ?? 0) - (float)($caja->total_egresos ?? 0);
+
+            // Ventas realizadas durante este turno activo (desde fecha_apertura)
+            $ventas_turno = Venta::where('fecha', '>=', $caja->fecha_apertura)
+                ->where('estado', 'Completada')
+                ->with(['cliente', 'usuario'])
+                ->orderBy('fecha', 'desc')
+                ->get();
+
+            $total_ventas_efectivo = $ventas_turno->where('metodo_pago', 'Efectivo')->sum('total');
+            $total_ventas_transferencia = $ventas_turno->where('metodo_pago', '!=', 'Efectivo')->sum('total');
+            $total_facturado_turno = $ventas_turno->sum('total');
         }
+
+        $viewData = compact(
+            'caja',
+            'movimientos',
+            'saldo_teorico',
+            'ventas_turno',
+            'total_ventas_efectivo',
+            'total_ventas_transferencia',
+            'total_facturado_turno'
+        );
 
         /** @var User $user */
         $user = Auth::user();
         if ($user->rol_id === 2) {
-            return view('empleado.caja', compact('caja', 'movimientos', 'saldo_teorico'));
+            return view('empleado.caja', $viewData);
         }
 
-        return view('admin.caja', compact('caja', 'movimientos', 'saldo_teorico'));
+        return view('admin.caja', $viewData);
     }
 
     /**
@@ -46,6 +83,7 @@ class CajaController extends Controller
      */
     public function abrir(Request $request): JsonResponse
     {
+        $this->validarPermisoCaja();
         $request->validate([
             'saldo_inicial' => ['required', 'numeric', 'min:0'],
         ], [
@@ -89,6 +127,7 @@ class CajaController extends Controller
      */
     public function cerrar(Request $request): JsonResponse
     {
+        $this->validarPermisoCaja();
         $request->validate([
             'id_caja' => ['required', 'exists:cajas,id'],
             'saldo_final' => ['required', 'numeric', 'min:0'],
@@ -138,6 +177,7 @@ class CajaController extends Controller
      */
     public function registrarMovimiento(Request $request): JsonResponse
     {
+        $this->validarPermisoCaja();
         $request->validate([
             'id_caja' => ['required', 'exists:cajas,id'],
             'tipo' => ['required', 'in:Ingreso,Egreso'],
@@ -148,6 +188,14 @@ class CajaController extends Controller
         $caja = Caja::find($request->id_caja);
         if (!$caja || $caja->estado !== 'Abierta') {
             return response()->json(['ok' => false, 'msg' => 'La caja seleccionada no está abierta.'], 422);
+        }
+
+        $saldoActual = (float) $caja->saldo_inicial + (float) ($caja->total_ingresos ?? 0) - (float) ($caja->total_egresos ?? 0);
+        if ($request->tipo === 'Egreso' && (float)$request->monto > $saldoActual) {
+            return response()->json([
+                'ok' => false,
+                'msg' => 'Fondos insuficientes en caja para registrar este egreso. Saldo disponible: $' . number_format($saldoActual, 2)
+            ], 422);
         }
 
         try {
@@ -163,13 +211,9 @@ class CajaController extends Controller
 
                 // Actualizar totales en la caja activa
                 if ($request->tipo === 'Ingreso') {
-                    $caja->update([
-                        'total_ingresos' => DB::raw("COALESCE(total_ingresos, 0) + {$request->monto}")
-                    ]);
+                    $caja->increment('total_ingresos', $request->monto);
                 } else {
-                    $caja->update([
-                        'total_egresos' => DB::raw("COALESCE(total_egresos, 0) + {$request->monto}")
-                    ]);
+                    $caja->increment('total_egresos', $request->monto);
                 }
             });
 

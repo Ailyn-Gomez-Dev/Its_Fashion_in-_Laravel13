@@ -112,18 +112,32 @@
                         </div>
                     </div>
 
-                    <!-- Username -->
-                    <div>
-                        <label class="block text-sm font-medium text-brand-dark mb-2">Nombre de usuario <span class="text-brand-accent">*</span></label>
-                        <div class="relative group">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors pointer-events-none">
-                                <i class="fas fa-user text-sm"></i>
-                            </span>
-                            <input type="text" name="username" value="{{ old('username') }}" required maxlength="20"
-                                class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-brand-accent focus:bg-white transition-all text-brand-dark placeholder:text-gray-400 font-light"
-                                placeholder="Ej. Mi_username">
+                    <!-- Username & Documento -->
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-brand-dark mb-2">Nombre de usuario <span class="text-brand-accent">*</span></label>
+                            <div class="relative group">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors pointer-events-none">
+                                    <i class="fas fa-user text-sm"></i>
+                                </span>
+                                <input type="text" name="username" value="{{ old('username') }}" required maxlength="20"
+                                    class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-brand-accent focus:bg-white transition-all text-brand-dark placeholder:text-gray-400 font-light"
+                                    placeholder="Ej. Mi_username">
+                            </div>
+                            @error('username') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
-                        @error('username') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        <div>
+                            <label class="block text-sm font-medium text-brand-dark mb-2">Documento de Identidad <span class="text-brand-accent">*</span></label>
+                            <div class="relative group">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-accent transition-colors pointer-events-none">
+                                    <i class="fas fa-id-card text-sm"></i>
+                                </span>
+                                <input type="text" name="documento" value="{{ old('documento') }}" required maxlength="25"
+                                    class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-brand-accent focus:bg-white transition-all text-brand-dark placeholder:text-gray-400 font-light"
+                                    placeholder="Ej. 1020304050">
+                            </div>
+                            @error('documento') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
 
                     <!-- Email / Teléfono -->

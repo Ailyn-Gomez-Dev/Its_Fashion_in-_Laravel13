@@ -178,19 +178,29 @@
         <form id="form-cat" method="POST" action="" class="space-y-4">
             @csrf
             <input type="hidden" name="_method" id="form-method" value="">
+            <input type="hidden" name="categoria_id" id="cat-id" value="{{ old('categoria_id') }}">
 
             <div>
                 <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Nombre *</label>
                 <input type="text" name="nombre" id="cat-nombre" required placeholder="Ej: Blusas"
-                    class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none transition">
+                    value="{{ old('nombre') }}"
+                    class="w-full px-4 py-2.5 bg-slate-50 border-2 @error('nombre') border-red-500 @else border-slate-200 @enderror rounded-xl text-sm text-slate-700 focus:outline-none transition">
                 <p class="err hidden text-xs text-red-500 mt-1 ml-1" id="err-nombre">
                     <i class="fas fa-exclamation-circle mr-1"></i>El nombre es obligatorio.
                 </p>
+                <p class="err hidden text-xs text-red-500 mt-1 ml-1" id="err-duplicate">
+                    <i class="fas fa-exclamation-circle mr-1"></i>Ya existe una categoría con este nombre.
+                </p>
+                @error('nombre')
+                    <p class="text-xs text-red-500 mt-1 ml-1" id="err-nombre-backend">
+                        <i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}
+                    </p>
+                @enderror
             </div>
             <div>
                 <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Descripción</label>
                 <textarea name="descripcion" id="cat-desc" rows="3" placeholder="Descripción opcional..."
-                    class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 resize-none focus:outline-none transition"></textarea>
+                    class="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 resize-none focus:outline-none transition">{{ old('descripcion') }}</textarea>
             </div>
             <div class="flex gap-3 pt-2">
                 <button type="button" onclick="closeModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition text-sm">Cancelar</button>
@@ -302,28 +312,39 @@
         applyCategoriesPagination();
     }
 
+    let currentEditId = null;
+    const categoriasExistentes = @json($categorias->map(fn($c) => ['id' => $c->id, 'nombre' => mb_strtolower(trim($c->nombre))]));
+
     // Abrir modal configurado para creación o edición
     function openModal(mode, data = null) {
         const modal = document.getElementById('modal-cat');
         const form = document.getElementById('form-cat');
         const methodInput = document.getElementById('form-method');
+        const catIdInput = document.getElementById('cat-id');
         const title = document.getElementById('modal-title');
         const btnText = document.getElementById('btn-text');
 
         // Limpiar errores previos
         document.getElementById('err-nombre').classList.add('hidden');
+        document.getElementById('err-duplicate').classList.add('hidden');
+        const errBackend = document.getElementById('err-nombre-backend');
+        if (errBackend) errBackend.classList.add('hidden');
         document.getElementById('cat-nombre').style.borderColor = '';
 
         if (mode === 'create') {
+            currentEditId = null;
             form.action = STORE_URL;
             methodInput.value = 'POST';
+            if (catIdInput) catIdInput.value = '';
             document.getElementById('cat-nombre').value = '';
             document.getElementById('cat-desc').value = '';
             title.textContent = 'Nueva categoría';
             btnText.textContent = 'Guardar';
         } else if (mode === 'edit' && data) {
+            currentEditId = data.id;
             form.action = `${BASE_URL}/${data.id}`;
             methodInput.value = 'PUT';
+            if (catIdInput) catIdInput.value = data.id;
             document.getElementById('cat-nombre').value = data.nombre;
             document.getElementById('cat-desc').value = data.descripcion || '';
             title.textContent = 'Editar categoría';
@@ -331,6 +352,7 @@
         }
 
         modal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('cat-nombre').focus(), 50);
     }
 
     // Cerrar modal
@@ -383,18 +405,63 @@
             el.style.boxShadow = '0 0 0 3px rgba(59,130,246,.15)';
         });
         el.addEventListener('blur', () => {
-            el.style.borderColor = '';
             el.style.boxShadow = '';
         });
+    });
+
+    // Validación reactiva de duplicados al tipear
+    document.getElementById('cat-nombre').addEventListener('input', function() {
+        const val = this.value.trim().toLowerCase();
+        const errNom = document.getElementById('err-nombre');
+        const errDup = document.getElementById('err-duplicate');
+        const errBackend = document.getElementById('err-nombre-backend');
+
+        if (errBackend) errBackend.classList.add('hidden');
+
+        if (!val) {
+            this.style.borderColor = '#ef4444';
+            errNom.classList.remove('hidden');
+            errDup.classList.add('hidden');
+            return;
+        }
+
+        errNom.classList.add('hidden');
+        const isDuplicate = categoriasExistentes.some(c => c.nombre === val && c.id !== currentEditId);
+
+        if (isDuplicate) {
+            this.style.borderColor = '#ef4444';
+            errDup.classList.remove('hidden');
+        } else {
+            this.style.borderColor = '';
+            errDup.classList.add('hidden');
+        }
     });
 
     // Validar en el cliente antes de enviar el formulario
     document.getElementById('form-cat').addEventListener('submit', function(e) {
         const nombreInput = document.getElementById('cat-nombre');
-        if (!nombreInput.value.trim()) {
+        const val = nombreInput.value.trim().toLowerCase();
+
+        if (!val) {
             e.preventDefault();
             nombreInput.style.borderColor = '#ef4444';
             document.getElementById('err-nombre').classList.remove('hidden');
+            return;
+        }
+
+        const isDuplicate = categoriasExistentes.some(c => c.nombre === val && c.id !== currentEditId);
+        if (isDuplicate) {
+            e.preventDefault();
+            nombreInput.style.borderColor = '#ef4444';
+            document.getElementById('err-duplicate').classList.remove('hidden');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Categoría Duplicada',
+                text: `Ya existe una categoría con el nombre "${nombreInput.value.trim()}". Por favor elige un nombre diferente.`,
+                confirmButtonColor: '#2563eb',
+                confirmButtonText: 'Entendido'
+            });
+            return;
         }
     });
 
@@ -402,6 +469,59 @@
     @if (session('toast'))
         document.addEventListener('DOMContentLoaded', () => {
             showToast(@json(session('toast')['text']), @json(session('toast')['type']));
+        });
+    @endif
+
+    // Mostrar mensaje de error si existe en sesión
+    @if (session('error'))
+        document.addEventListener('DOMContentLoaded', () => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: @json(session('error')),
+                confirmButtonColor: '#2563eb'
+            });
+        });
+    @endif
+
+    // Notificación y reapertura del modal ante errores de validación del backend
+    @if ($errors->any())
+        document.addEventListener('DOMContentLoaded', () => {
+            Swal.fire({
+                icon: 'error',
+                title: 'No se pudo guardar la categoría',
+                html: @json(implode('<br>', array_map('htmlspecialchars', $errors->all()))),
+                confirmButtonColor: '#2563eb',
+                confirmButtonText: 'Corregir'
+            });
+
+            const modal = document.getElementById('modal-cat');
+            const form = document.getElementById('form-cat');
+            const methodInput = document.getElementById('form-method');
+            const catIdInput = document.getElementById('cat-id');
+            const title = document.getElementById('modal-title');
+            const btnText = document.getElementById('btn-text');
+
+            @if(old('_method') === 'PUT' && old('categoria_id'))
+                currentEditId = {{ (int) old('categoria_id') }};
+                title.textContent = 'Editar categoría';
+                btnText.textContent = 'Actualizar';
+                methodInput.value = 'PUT';
+                form.action = `${BASE_URL}/{{ old('categoria_id') }}`;
+                if (catIdInput) catIdInput.value = '{{ old('categoria_id') }}';
+            @else
+                currentEditId = null;
+                title.textContent = 'Nueva categoría';
+                btnText.textContent = 'Guardar';
+                methodInput.value = 'POST';
+                form.action = STORE_URL;
+                if (catIdInput) catIdInput.value = '';
+            @endif
+
+            document.getElementById('cat-nombre').value = @json(old('nombre', ''));
+            document.getElementById('cat-desc').value = @json(old('descripcion', ''));
+            document.getElementById('cat-nombre').style.borderColor = '#ef4444';
+            modal.classList.remove('hidden');
         });
     @endif
 </script>

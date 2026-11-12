@@ -1,4 +1,4 @@
-@extends('layouts.Sidebarempleado')
+@extends('layouts.sidebarempleado')
 
 @section('titulo', 'Ventas (Empleado)')
 
@@ -154,6 +154,9 @@
                                     <button onclick="verDetalle({{ $v->id }})" class="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition" title="Ver detalle">
                                         <i class="fas fa-eye text-xs"></i>
                                     </button>
+                                    <a href="{{ route('ventas.comprobante', $v->id) }}" target="_blank" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center transition" title="Imprimir Comprobante">
+                                        <i class="fas fa-print text-xs"></i>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -204,11 +207,14 @@
                 <div class="relative">
                     <label class="text-xs font-semibold text-slate-600 mb-1.5 block">Cliente</label>
                     <div class="relative">
-                        <input type="text" id="cliente-input" placeholder="Buscar cliente por nombre o email..." oninput="buscarCliente(this.value)"
+                        <input type="text" id="cliente-input" placeholder="Buscar por nombre, documento o email..."
+                            onfocus="buscarCliente(this.value)"
+                            oninput="buscarCliente(this.value)"
+                            autocomplete="off"
                             class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:border-brand-accent transition">
                         <i class="fas fa-search absolute left-4 top-3.5 text-slate-400 text-xs"></i>
                     </div>
-                    <div id="cliente-results" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50"></div>
+                    <div id="cliente-results" class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 max-h-60 overflow-y-auto"></div>
                     <div id="cliente-sel" class="hidden mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 flex items-center justify-between">
                         <span id="cliente-sel-nombre" class="font-semibold"></span>
                         <button onclick="removerCliente()" class="text-blue-500 hover:text-blue-700"><i class="fas fa-times"></i></button>
@@ -299,9 +305,10 @@
     function mostrarAdvertenciaCaja() {
         Swal.fire({
             icon: 'warning',
-            title: 'Caja cerrada',
-            text: 'Debes abrir la caja primero para poder registrar ventas.',
+            title: 'Caja Cerrada',
+            text: 'Debes abrir una caja en el módulo de Caja antes de poder registrar ventas.',
             confirmButtonColor: '#2563eb',
+            confirmButtonText: 'Entendido'
         });
     }
 
@@ -407,28 +414,61 @@
         document.getElementById('modal-venta').classList.add('hidden');
     }
 
-    function buscarCliente(q) {
+    function buscarCliente(q = '') {
         clearTimeout(clienteTimer);
-        if (q.trim().length < 2) {
-            document.getElementById('cliente-results').classList.add('hidden');
-            return;
-        }
+        const box = document.getElementById('cliente-results');
+        const term = (q || '').trim();
+
         clienteTimer = setTimeout(() => {
-            fetch(`${CLIENTES_SEARCH_URL}?q=${encodeURIComponent(q)}`)
+            fetch(`${CLIENTES_SEARCH_URL}?q=${encodeURIComponent(term)}`)
                 .then(r => r.json())
                 .then(data => {
-                    const box = document.getElementById('cliente-results');
-                    if (!data.length) { box.classList.add('hidden'); return; }
-                    box.innerHTML = data.map(c => `
-                        <div class="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm text-slate-700"
-                            onclick="selCliente(${c.id}, '${c.nombre} ${c.apellido}')">
-                            ${c.nombre} ${c.apellido} <span class="text-slate-400 text-xs">(${c.email})</span>
+                    if (!data.length) {
+                        if (term.length > 0) {
+                            box.innerHTML = `
+                                <div class="p-3 text-center">
+                                    <p class="text-xs font-semibold text-slate-700">Sin coincidencias para "${term.replace(/[<>&"]/g, '')}"</p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">La venta se registrará a cliente Mostrador.</p>
+                                </div>
+                            `;
+                            box.classList.remove('hidden');
+                        } else {
+                            box.innerHTML = `<div class="p-3 text-center text-xs text-slate-400">No hay clientes registrados</div>`;
+                            box.classList.remove('hidden');
+                        }
+                        return;
+                    }
+                    const titulo = term.length > 0 ? 'Resultados' : 'Sugerencias';
+                    box.innerHTML = `
+                        <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
+                            <span>${titulo}</span>
+                            <span>${data.length} cliente(s)</span>
+                        </div>
+                    ` + data.map(c => `
+                        <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0 flex items-center justify-between"
+                            onclick="selCliente(${c.id}, '${(c.nombre + ' ' + (c.apellido || '')).replace(/'/g, "\\'")}')">
+                            <div>
+                                <span class="font-semibold text-slate-800">${c.nombre} ${c.apellido || ''}</span>
+                                <span class="text-slate-400 text-xs block">${c.documento ? c.documento + ' · ' : ''}${c.email || ''}</span>
+                            </div>
+                            <span class="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 font-semibold">Elegir</span>
                         </div>
                     `).join('');
                     box.classList.remove('hidden');
+                })
+                .catch(() => {
+                    box.classList.add('hidden');
                 });
-        }, 300);
+        }, 150);
     }
+
+    document.addEventListener('click', function(e) {
+        const box = document.getElementById('cliente-results');
+        const inp = document.getElementById('cliente-input');
+        if (box && !box.contains(e.target) && e.target !== inp) {
+            box.classList.add('hidden');
+        }
+    });
 
     function selCliente(id, name) {
         clienteId = id;
@@ -449,7 +489,7 @@
         const id = parseInt(sel.value);
         const qty = parseInt(qtyInp.value);
         if (!id || !qty || qty < 1) {
-            showToast('Selecciona un producto y cantidad válida.', 'error');
+            showToast('Selecciona un producto y una cantidad valida.', 'error');
             return;
         }
         const opt = sel.options[sel.selectedIndex];
@@ -460,7 +500,7 @@
         const exist = items.find(i => i.id_producto === id);
         const currentQty = exist ? exist.cantidad : 0;
         if (currentQty + qty > stock) {
-            showToast(`Stock insuficiente. Solo quedan ${stock} unidades.`, 'error');
+            showToast(`Stock insuficiente. Disponible en stock: ${stock}`, 'error');
             return;
         }
 
@@ -514,7 +554,7 @@
 
     function registrarVenta() {
         if (!items.length) {
-            showToast('El carrito está vacío.', 'error');
+            showToast('Agrega al menos un producto a la venta.', 'error');
             return;
         }
         const fd = new FormData();
@@ -532,13 +572,22 @@
         .then(d => {
             if (d.ok) {
                 closeModal();
+                const saleId = d.id_venta || d.id;
                 Swal.fire({
                     icon: 'success',
                     title: '¡Venta Registrada!',
                     text: d.msg,
+                    showCancelButton: true,
                     confirmButtonColor: '#2563eb',
-                    confirmButtonText: 'Excelente'
-                }).then(() => location.reload());
+                    cancelButtonColor: '#64748b',
+                    confirmButtonText: '<i class="fas fa-print mr-1"></i> Imprimir Comprobante',
+                    cancelButtonText: 'Aceptar'
+                }).then((result) => {
+                    if (result.isConfirmed && saleId) {
+                        window.open(`${BASE_URL}/${saleId}/comprobante`, '_blank');
+                    }
+                    location.reload();
+                });
             } else {
                 Swal.fire('Atención', d.msg, 'error');
             }
@@ -590,9 +639,14 @@
                         `).join('')}
                     </tbody>
                 </table>
-                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl mb-4">
                     <span class="font-semibold text-slate-700">Total Venta</span>
                     <span class="text-xl font-bold text-blue-600">${total}</span>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <a href="${BASE_URL}/${id}/comprobante" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition shadow">
+                        <i class="fas fa-print"></i> Imprimir Comprobante
+                    </a>
                 </div>
             `;
             document.getElementById('modal-det').classList.remove('hidden');

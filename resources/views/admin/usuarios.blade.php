@@ -151,13 +151,13 @@
                     $ini = strtoupper(substr($u->nombre, 0, 1) . substr($u->apellido, 0, 1));
                     $toggleClass = $u->estado === 'Activo' ? 'on' : 'off';
                     @endphp
-                    <tr class="trow" data-search="{{ strtolower("{$u->nombre} {$u->apellido} {$u->username} {$u->email}") }}">
+                    <tr class="trow" data-search="{{ strtolower("{$u->nombre} {$u->apellido} {$u->username} {$u->email} {$u->documento}") }}">
                         <td class="px-6 py-4 border-b border-slate-50">
                             <div class="flex items-center gap-3">
                                 <div class="w-9 h-9 bg-brand-accent rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{{ $ini }}</div>
                                 <div>
                                     <p class="font-semibold text-slate-800 text-sm">{{ $u->nombre }} {{ $u->apellido }}</p>
-                                    <p class="text-xs text-slate-500">{{ '@'.$u->username }}</p>
+                                    <p class="text-xs text-slate-500">{{ '@'.$u->username }} @if($u->documento) · <span class="font-mono text-slate-600 font-medium"><i class="fas fa-id-card text-[10px] mr-0.5"></i>{{ $u->documento }}</span>@endif</p>
                                 </div>
                             </div>
                         </td>
@@ -168,8 +168,21 @@
                         <td class="px-6 py-4 border-b border-slate-50">
                             @if ($u->rol_id === 1)
                             <span class="badge bg-blue-100 text-blue-500">Administrador</span>
-                            @else
+                            @elseif ($u->rol_id === 2)
                             <span class="badge bg-amber-100 text-amber-700">Empleado</span>
+                            <div class="mt-1">
+                                @if($u->puede_operar_caja)
+                                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                    <i class="fas fa-cash-register text-[10px]"></i> Caja Habilitada
+                                </span>
+                                @else
+                                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                    <i class="fas fa-ban text-[10px]"></i> Sin Caja
+                                </span>
+                                @endif
+                            </div>
+                            @else
+                            <span class="badge bg-emerald-100 text-emerald-700">Cliente</span>
                             @endif
                         </td>
                         <td class="px-6 py-4 border-b border-slate-50">
@@ -186,6 +199,8 @@
                                 data-nombre="{{ $u->nombre }}"
                                 data-apellido="{{ $u->apellido }}"
                                 data-username="{{ $u->username }}"
+                                data-documento="{{ $u->documento ?? '' }}"
+                                data-puede-operar-caja="{{ $u->puede_operar_caja ? '1' : '0' }}"
                                 data-email="{{ $u->email }}"
                                 data-telefono="{{ $u->telefono }}"
                                 data-estado="{{ $u->estado }}"
@@ -228,43 +243,78 @@
             <form id="user-form" method="POST" onsubmit="submitForm(event)" novalidate>
                 @csrf
                 <input type="hidden" name="_method" id="form-method" value="">
+                <input type="hidden" name="user_id" id="f-user-id" value="{{ old('user_id') }}">
 
                 <div class="grid grid-cols-2 gap-x-4">
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nombre <span class="text-red-500">*</span></label>
                         <input type="text" id="f-nombre" name="nombre" placeholder="Nombre"
-                            class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                            value="{{ old('nombre') }}"
+                            class="w-full px-4 py-3 bg-slate-50 border-2 @error('nombre') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
                         <p class="err hidden text-xs text-red-500 mt-1 ml-1" data-for="f-nombre"><i class="fas fa-exclamation-circle mr-1"></i>Requerido</p>
+                        @error('nombre')
+                            <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                        @enderror
                     </div>
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Apellido <span class="text-red-500">*</span></label>
                         <input type="text" id="f-apellido" name="apellido" placeholder="Apellido"
-                            class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                            value="{{ old('apellido') }}"
+                            class="w-full px-4 py-3 bg-slate-50 border-2 @error('apellido') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
                         <p class="err hidden text-xs text-red-500 mt-1 ml-1" data-for="f-apellido"><i class="fas fa-exclamation-circle mr-1"></i>Requerido</p>
+                        @error('apellido')
+                            <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nombre de usuario <span class="text-red-500">*</span></label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-3 flex items-center text-slate-400 text-sm pointer-events-none">@</span>
-                        <input type="text" id="f-username" name="username" placeholder="usuario_ejemplo"
-                            class="w-full pl-8 pr-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                <div class="grid grid-cols-2 gap-x-4">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nombre de usuario <span class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-3 flex items-center text-slate-400 text-sm pointer-events-none">@</span>
+                            <input type="text" id="f-username" name="username" placeholder="usuario_ejemplo"
+                                value="{{ old('username') }}"
+                                class="w-full pl-8 pr-4 py-3 bg-slate-50 border-2 @error('username') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                        </div>
+                        <p class="err hidden text-xs text-red-500 mt-1 ml-1" data-for="f-username"><i class="fas fa-exclamation-circle mr-1"></i>Requerido</p>
+                        @error('username')
+                            <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                        @enderror
                     </div>
-                    <p class="err hidden text-xs text-red-500 mt-1 ml-1" data-for="f-username"><i class="fas fa-exclamation-circle mr-1"></i>Requerido</p>
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Documento de Identidad</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-3 flex items-center text-slate-400 text-sm pointer-events-none"><i class="fas fa-id-card"></i></span>
+                            <input type="text" id="f-documento" name="documento" placeholder="Ej: 1020304050"
+                                value="{{ old('documento') }}"
+                                class="w-full pl-9 pr-4 py-3 bg-slate-50 border-2 @error('documento') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                        </div>
+                        @error('documento')
+                            <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-x-4">
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Correo electrónico <span class="text-red-500">*</span></label>
                         <input type="email" id="f-email" name="email" placeholder="correo@ejemplo.com"
-                            class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                            value="{{ old('email') }}"
+                            class="w-full px-4 py-3 bg-slate-50 border-2 @error('email') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
                         <p class="err hidden text-xs text-red-500 mt-1 ml-1" data-for="f-email"><i class="fas fa-exclamation-circle mr-1"></i>Requerido</p>
+                        @error('email')
+                            <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                        @enderror
                     </div>
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Teléfono</label>
                         <input type="text" id="f-telefono" name="telefono" placeholder="3001234567"
-                            class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                            value="{{ old('telefono') }}"
+                            class="w-full px-4 py-3 bg-slate-50 border-2 @error('telefono') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                        @error('telefono')
+                            <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
 
@@ -272,7 +322,7 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Contraseña <span class="text-red-500" id="pw-required">*</span></label>
                     <div class="relative">
                         <input type="password" id="f-password" name="password" placeholder="Mín. 8 car., mayúscula, minúscula y número" oninput="checkPwStrength()"
-                            class="w-full pr-12 px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
+                            class="w-full pr-12 px-4 py-3 bg-slate-50 border-2 @error('password') border-red-500 @else border-slate-200 @enderror rounded-xl text-slate-700 text-sm placeholder-slate-400 transition">
                         <button type="button" id="toggle-pw" class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition">
                             <i class="fas fa-eye text-sm"></i>
                         </button>
@@ -284,6 +334,9 @@
                         <div class="flex-1 h-1 rounded-full bg-slate-200" id="s4"></div>
                     </div>
                     <p class="err hidden text-xs text-red-500 mt-1 ml-1" data-for="f-password"><i class="fas fa-exclamation-circle mr-1"></i>Mín. 8 car., mayúscula, minúscula y número</p>
+                    @error('password')
+                        <p class="text-xs text-red-500 mt-1 ml-1"><i class="fas fa-exclamation-circle mr-1"></i>{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="grid grid-cols-2 gap-x-4">
@@ -291,17 +344,27 @@
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Rol <span class="text-red-500">*</span></label>
                         <select id="f-rol" name="rol_id" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm cursor-pointer transition">
                             @foreach ($roles as $rol)
-                            <option value="{{ $rol->id }}">{{ $rol->descripcion }}</option>
+                            <option value="{{ $rol->id }}" {{ old('rol_id') == $rol->id ? 'selected' : '' }}>{{ $rol->descripcion }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="mb-4">
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Estado</label>
                         <select id="f-estado" name="estado" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-700 text-sm cursor-pointer transition">
-                            <option value="Activo">Activo</option>
-                            <option value="Inactivo">Inactivo</option>
+                            <option value="Activo" {{ old('estado') == 'Activo' ? 'selected' : '' }}>Activo</option>
+                            <option value="Inactivo" {{ old('estado') == 'Inactivo' ? 'selected' : '' }}>Inactivo</option>
                         </select>
                     </div>
+                </div>
+
+                <div id="caja-permiso-container" class="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="f-puede-operar-caja" name="puede_operar_caja" value="1" {{ old('puede_operar_caja', '1') == '1' ? 'checked' : '' }} class="mt-1 w-4 h-4 text-brand-accent rounded border-slate-300 focus:ring-brand-accent">
+                        <div>
+                            <span class="text-sm font-semibold text-slate-800">Habilitar operación de caja registradora</span>
+                            <p class="text-xs text-slate-500 mt-0.5">Permite a este colaborador abrir caja, procesar ventas y cobrar en el punto de venta (POS).</p>
+                        </div>
+                    </label>
                 </div>
 
                 <div class="flex justify-end gap-3 pt-2">
@@ -389,22 +452,31 @@
         document.getElementById('modal-title').textContent = mode === 'create' ? 'Crear nuevo usuario' : 'Editar usuario';
 
         const form = document.getElementById('user-form');
+        const userIdInput = document.getElementById('f-user-id');
         clearForm();
 
         if (mode === 'create') {
             form.action = STORE_URL;
             document.getElementById('form-method').value = '';
+            if (userIdInput) userIdInput.value = '';
+            document.getElementById('f-puede-operar-caja').checked = true;
+            document.getElementById('pw-required').style.display = '';
+            setTimeout(() => document.getElementById('f-nombre').focus(), 50);
         } else {
             form.action = `${BASE_URL}/${data.id}`;
             document.getElementById('form-method').value = 'PUT';
+            if (userIdInput) userIdInput.value = data.id;
             document.getElementById('f-nombre').value = data.nombre;
             document.getElementById('f-apellido').value = data.apellido;
             document.getElementById('f-username').value = data.username;
+            document.getElementById('f-documento').value = data.documento || '';
             document.getElementById('f-email').value = data.email;
             document.getElementById('f-telefono').value = data.telefono || '';
             document.getElementById('f-estado').value = data.estado;
             document.getElementById('f-rol').value = data.rolId;
+            document.getElementById('f-puede-operar-caja').checked = data.puedeOperarCaja === '1';
             document.getElementById('pw-required').style.display = 'none';
+            setTimeout(() => document.getElementById('f-nombre').focus(), 50);
         }
     }
 
@@ -413,8 +485,16 @@
     }
 
     function clearForm() {
-        ['f-nombre', 'f-apellido', 'f-username', 'f-email', 'f-telefono', 'f-password'].forEach(id => document.getElementById(id).value = '');
+        ['f-nombre', 'f-apellido', 'f-username', 'f-documento', 'f-email', 'f-telefono', 'f-password'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.value = '';
+                el.classList.remove('border-red-500');
+                el.classList.add('border-slate-200');
+            }
+        });
         document.getElementById('f-estado').value = 'Activo';
+        document.getElementById('f-puede-operar-caja').checked = true;
         document.getElementById('pw-required').style.display = '';
         document.querySelectorAll('.err').forEach(e => e.classList.add('hidden'));
         ['s1', 's2', 's3', 's4'].forEach(id => document.getElementById(id).style.background = '#e2e8f0');
@@ -509,13 +589,71 @@
             el.style.boxShadow = '0 0 0 3px rgba(59,130,246,.15)';
         });
         el.addEventListener('blur', () => {
-            el.style.borderColor = '';
             el.style.boxShadow = '';
         });
     });
 
+    @if(session('toast'))
+    document.addEventListener('DOMContentLoaded', () => {
+        showToast(@json(session('toast')['text']), @json(session('toast')['type']));
+    });
+    @endif
+
+    @if(session('error'))
+    document.addEventListener('DOMContentLoaded', () => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: @json(session('error')),
+            confirmButtonColor: '#2563eb'
+        });
+    });
+    @endif
+
+    // Notificación de errores de validación y reapertura del modal reteniendo datos
     @if ($errors->any())
-    document.addEventListener('DOMContentLoaded', () => openModal('create'));
+    document.addEventListener('DOMContentLoaded', () => {
+        Swal.fire({
+            icon: 'error',
+            title: 'No se pudo guardar el usuario',
+            html: @json(implode('<br>', array_map('htmlspecialchars', $errors->all()))),
+            confirmButtonColor: '#2563eb',
+            confirmButtonText: 'Corregir'
+        });
+
+        const modal = document.getElementById('modal');
+        const form = document.getElementById('user-form');
+        const methodInput = document.getElementById('form-method');
+        const userIdInput = document.getElementById('f-user-id');
+        const title = document.getElementById('modal-title');
+        const pwRequired = document.getElementById('pw-required');
+
+        @if(old('_method') === 'PUT' && old('user_id'))
+            title.textContent = 'Editar usuario';
+            methodInput.value = 'PUT';
+            form.action = `${BASE_URL}/{{ old('user_id') }}`;
+            if (userIdInput) userIdInput.value = '{{ old('user_id') }}';
+            if (pwRequired) pwRequired.style.display = 'none';
+        @else
+            title.textContent = 'Crear nuevo usuario';
+            methodInput.value = '';
+            form.action = STORE_URL;
+            if (userIdInput) userIdInput.value = '';
+            if (pwRequired) pwRequired.style.display = '';
+        @endif
+
+        document.getElementById('f-nombre').value = @json(old('nombre', ''));
+        document.getElementById('f-apellido').value = @json(old('apellido', ''));
+        document.getElementById('f-username').value = @json(old('username', ''));
+        document.getElementById('f-documento').value = @json(old('documento', ''));
+        document.getElementById('f-email').value = @json(old('email', ''));
+        document.getElementById('f-telefono').value = @json(old('telefono', ''));
+        document.getElementById('f-rol').value = @json(old('rol_id', ''));
+        document.getElementById('f-estado').value = @json(old('estado', 'Activo'));
+        document.getElementById('f-puede-operar-caja').checked = {{ old('puede_operar_caja', '1') == '1' ? 'true' : 'false' }};
+
+        modal.classList.remove('hidden');
+    });
     @endif
 </script>
 @endpush

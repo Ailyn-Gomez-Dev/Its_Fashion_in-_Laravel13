@@ -1,4 +1,4 @@
-@extends('layouts.Sidebarcliente')
+@extends('layouts.sidebarcliente')
 
 @section('titulo', 'Mi Cuenta')
 
@@ -121,11 +121,16 @@
                                     {{ $v->fecha ? $v->fecha->format('d/m/Y') : '—' }} · {{ $v->metodo_pago }}
                                 </p>
                             </div>
-                            <div class="text-right">
-                                <p class="text-sm font-bold text-slate-800">${{ number_format($v->total, 2) }}</p>
-                                <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full {{ $v->estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
-                                    {{ $v->estado }}
-                                </span>
+                            <div class="flex items-center gap-3">
+                                <div class="text-right">
+                                    <p class="text-sm font-bold text-slate-800">${{ number_format($v->total, 2) }}</p>
+                                    <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full {{ $v->estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                        {{ $v->estado }}
+                                    </span>
+                                </div>
+                                <a href="{{ route('ventas.comprobante', $v->id) }}" target="_blank" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center transition" title="Ver Comprobante">
+                                    <i class="fas fa-print text-xs"></i>
+                                </a>
                             </div>
                         </div>
                     @endforeach

@@ -1,4 +1,4 @@
-@extends('layouts.Sidebarcliente')
+@extends('layouts.sidebarcliente')
 
 @section('titulo', 'Mis Devoluciones')
 

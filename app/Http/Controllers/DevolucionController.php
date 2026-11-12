@@ -73,6 +73,12 @@ class DevolucionController extends Controller
             return response()->json(['ok' => false, 'msg' => 'La venta no existe.']);
         }
 
+        /** @var User $user */
+        $user = Auth::user();
+        if ((int)$user->rol_id === 3 && (int)$venta->cliente_id !== (int)$user->id) {
+            return response()->json(['ok' => false, 'msg' => 'No puedes solicitar devoluciones sobre compras ajenas.'], 403);
+        }
+
         if ($venta->estado !== 'Completada') {
             return response()->json(['ok' => false, 'msg' => 'Solo se pueden solicitar devoluciones de ventas completadas.']);
         }
@@ -84,18 +90,33 @@ class DevolucionController extends Controller
 
                 $totalDevolucion = 0;
 
-                // Validar cantidades devueltas contra la venta original
+                // Validar cantidades devueltas contra la venta original restando devoluciones previas
                 foreach ($items as $item) {
-                    $prodId = $item['id_producto'];
-                    $qtyDevuelta = $item['cantidad'];
+                    $prodId = (int)$item['id_producto'];
+                    $qtyDevuelta = (int)$item['cantidad'];
 
-                    if (!isset($detallesVenta[$prodId]) || $qtyDevuelta > $detallesVenta[$prodId]) {
-                        throw new \Exception("La cantidad a devolver de un artículo supera la cantidad comprada originalmente.");
+                    if ($qtyDevuelta <= 0) {
+                        throw new \Exception("La cantidad a devolver debe ser mayor a cero.");
+                    }
+
+                    if (!isset($detallesVenta[$prodId])) {
+                        throw new \Exception("El producto ID #{$prodId} no pertenece a la venta original.");
+                    }
+
+                    // Calcular cantidad ya devuelta o en trámite para este producto en esta venta
+                    $yaDevuelto = DetalleDevolucion::whereHas('devolucion', function ($q) use ($venta) {
+                        $q->where('venta_id', $venta->id)->whereIn('estado', ['Pendiente', 'Aceptada']);
+                    })->where('producto_id', $prodId)->sum('cantidad');
+
+                    $disponible = (int)$detallesVenta[$prodId] - (int)$yaDevuelto;
+
+                    if ($qtyDevuelta > $disponible) {
+                        throw new \Exception("La cantidad a devolver ({$qtyDevuelta}) supera las unidades disponibles para devolución ({$disponible}) del producto seleccionado.");
                     }
 
                     // Obtener precio original de la venta
                     $detalleVentaOriginal = DetalleVenta::where('venta_id', $venta->id)->where('producto_id', $prodId)->first();
-                    $precioOriginal = $detalleVentaOriginal->precio_unitario;
+                    $precioOriginal = (float)$detalleVentaOriginal->precio_unitario;
 
                     $totalDevolucion += $qtyDevuelta * $precioOriginal;
                 }
@@ -166,6 +187,12 @@ class DevolucionController extends Controller
      */
     public function show(Devolucion $devolucion): JsonResponse
     {
+        /** @var User $user */
+        $user = Auth::user();
+        if ((int)$user->rol_id === 3 && (int)$devolucion->venta?->cliente_id !== (int)$user->id) {
+            return response()->json(['ok' => false, 'msg' => 'No autorizado para ver esta devolución.'], 403);
+        }
+
         $detalles = DetalleDevolucion::with('producto')
             ->where('devolucion_id', $devolucion->id)
             ->get()
@@ -216,36 +243,41 @@ class DevolucionController extends Controller
                 $detalles = DetalleDevolucion::where('devolucion_id', $devolucion->id)->get();
                 foreach ($detalles as $item) {
                     $producto = Producto::lockForUpdate()->find($item->producto_id);
-                    $nuevoStock = $producto->stock + $item->cantidad;
-                    $producto->update(['stock' => $nuevoStock]);
+                    if ($producto) {
+                        $nuevoStock = (int)$producto->stock + (int)$item->cantidad;
+                        $producto->update(['stock' => $nuevoStock]);
 
-                    // Kardex: Entrada por devolución
-                    Inventario::registrarMovimiento($producto->id, 'Entrada', $nuevoStock, $item->cantidad);
+                        // Kardex: Entrada por devolución
+                        Inventario::registrarMovimiento($producto->id, 'Entrada', $nuevoStock, $item->cantidad);
+                    }
                 }
 
-                // 3. Contabilizar egreso si hay una caja abierta
-                $caja = DB::table('cajas')->where('estado', 'Abierta')->first();
-                if ($caja) {
-                    $concepto = "Devolución #{$devolucion->id} (Venta #{$devolucion->venta_id})";
+                // 3. Contabilizar egreso en caja física ÚNICAMENTE si la venta original fue en Efectivo
+                $esPagoEfectivo = ($devolucion->venta?->metodo_pago === 'Efectivo');
+                if ($esPagoEfectivo) {
+                    $caja = DB::table('cajas')->where('estado', 'Abierta')->first();
+                    if ($caja) {
+                        $concepto = "Devolución #{$devolucion->id} (Venta #{$devolucion->venta_id})";
 
-                    // Registrar egreso
-                    DB::table('movimientos_caja')->insert([
-                        'caja_id' => $caja->id,
-                        'tipo' => 'Egreso',
-                        'monto' => $devolucion->total_devolucion,
-                        'concepto' => $concepto,
-                        'fecha' => now(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-
-                    // Actualizar egresos de la caja activa
-                    DB::table('cajas')
-                        ->where('id', $caja->id)
-                        ->update([
-                            'total_egresos' => DB::raw("COALESCE(total_egresos, 0) + {$devolucion->total_devolucion}"),
+                        // Registrar egreso
+                        DB::table('movimientos_caja')->insert([
+                            'caja_id' => $caja->id,
+                            'tipo' => 'Egreso',
+                            'monto' => $devolucion->total_devolucion,
+                            'concepto' => $concepto,
+                            'fecha' => now(),
+                            'created_at' => now(),
                             'updated_at' => now(),
                         ]);
+
+                        // Actualizar egresos de la caja activa
+                        DB::table('cajas')
+                            ->where('id', $caja->id)
+                            ->update([
+                                'total_egresos' => DB::raw("COALESCE(total_egresos, 0) + {$devolucion->total_devolucion}"),
+                                'updated_at' => now(),
+                            ]);
+                    }
                 }
             });
 
@@ -257,7 +289,7 @@ class DevolucionController extends Controller
                         'Devolución Aprobada',
                         "Tu solicitud de devolución para la venta #{$devolucion->venta_id} ha sido aprobada.",
                         'devolucion',
-                        url('/mis-devolaciones') // O ruta de devoluciones del cliente
+                        url('/devoluciones')
                     ));
                 }
             } catch (\Exception $ex) {
@@ -299,7 +331,7 @@ class DevolucionController extends Controller
                         'Devolución Rechazada',
                         "Tu solicitud de devolución para la venta #{$devolucion->venta_id} ha sido rechazada.",
                         'devolucion',
-                        url('/mis-devolaciones')
+                        url('/devoluciones')
                     ));
                 }
             } catch (\Exception $ex) {

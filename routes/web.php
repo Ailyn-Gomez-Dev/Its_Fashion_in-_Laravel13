@@ -18,6 +18,9 @@ use App\Http\Controllers\ReporteController;
 use App\Models\Producto;
 use App\Models\Venta;
 use App\Models\Devolucion;
+use App\Models\Categoria;
+use App\Models\DetalleVenta;
+use Illuminate\Support\Facades\DB;
 
 
 Route::get('/', function () {
@@ -29,17 +32,62 @@ Route::get('/dashboard', function () {
     $user = Auth::user();
 
     return match ((int) $user->rol_id) {
-        1 => view('admin.dashboard', [
-            'totalClientes'          => User::where('rol_id', 3)->count(),
-            'clientesActivos'        => User::where('rol_id', 3)->where('estado', 'Activo')->count(),
-            'totalProductos'         => Producto::count(),
-            'productosActivos'       => Producto::where('estado', 'Activo')->count(),
-            'ventasHoy'              => Venta::whereDate('fecha', today())->where('estado', 'Completada')->sum('total'),
-            'ventasHoyCount'         => Venta::whereDate('fecha', today())->where('estado', 'Completada')->count(),
-            'ingresosMes'            => Venta::whereMonth('fecha', today()->month)->whereYear('fecha', today()->year)->where('estado', 'Completada')->sum('total'),
-            'ingresosMesCount'       => Venta::whereMonth('fecha', today()->month)->whereYear('fecha', today()->year)->where('estado', 'Completada')->count(),
-            'devolucionesPendientes' => Devolucion::where('estado', 'Pendiente')->count(),
-        ]),
+        1 => (function() {
+            $ultimos7Dias = [];
+            $ventas7Dias = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $dia = today()->subDays($i);
+                $ultimos7Dias[] = $dia->format('d M');
+                $ventas7Dias[] = (float) Venta::whereDate('fecha', $dia)
+                    ->where('estado', 'Completada')
+                    ->sum('total');
+            }
+
+            $categorias = Categoria::withSum('productos', 'stock')->get();
+            $categoriasLabels = $categorias->pluck('nombre')->toArray();
+            $categoriasStock = $categorias->map(fn($c) => (int)($c->productos_sum_stock ?? 0))->toArray();
+
+            $metodosPago = [
+                'Efectivo' => (float) Venta::where('metodo_pago', 'Efectivo')->where('estado', 'Completada')->sum('total'),
+                'Transferencia' => (float) Venta::where('metodo_pago', 'Transferencia bancaria')->where('estado', 'Completada')->sum('total'),
+            ];
+
+            $stockNormal = Producto::where('estado', 'Activo')->whereColumn('stock', '>', 'stock_minimo')->count();
+            $stockCritico = Producto::where('estado', 'Activo')->whereColumn('stock', '<=', 'stock_minimo')->where('stock', '>', 0)->count();
+            $stockAgotado = Producto::where('estado', 'Activo')->where('stock', '<=', 0)->count();
+
+            $topProductos = DetalleVenta::select('producto_id', DB::raw('SUM(cantidad) as total_vendido'))
+                ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')
+                ->where('ventas.estado', 'Completada')
+                ->groupBy('producto_id')
+                ->orderByDesc('total_vendido')
+                ->with('producto')
+                ->take(5)
+                ->get();
+
+            return view('admin.dashboard', [
+                'totalClientes'          => User::where('rol_id', 3)->count(),
+                'clientesActivos'        => User::where('rol_id', 3)->where('estado', 'Activo')->count(),
+                'totalProductos'         => Producto::count(),
+                'productosActivos'       => Producto::where('estado', 'Activo')->count(),
+                'ventasHoy'              => Venta::whereDate('fecha', today())->where('estado', 'Completada')->sum('total'),
+                'ventasHoyCount'         => Venta::whereDate('fecha', today())->where('estado', 'Completada')->count(),
+                'ingresosMes'            => Venta::whereMonth('fecha', today()->month)->whereYear('fecha', today()->year)->where('estado', 'Completada')->sum('total'),
+                'ingresosMesCount'       => Venta::whereMonth('fecha', today()->month)->whereYear('fecha', today()->year)->where('estado', 'Completada')->count(),
+                'devolucionesPendientes' => Devolucion::where('estado', 'Pendiente')->count(),
+                'chartDias'              => $ultimos7Dias,
+                'chartVentas'            => $ventas7Dias,
+                'chartCategoriasLabels'  => $categoriasLabels,
+                'chartCategoriasStock'   => $categoriasStock,
+                'chartMetodos'           => $metodosPago,
+                'stockSalud'             => [
+                    'normal'  => $stockNormal,
+                    'critico' => $stockCritico,
+                    'agotado' => $stockAgotado,
+                ],
+                'topProductos'           => $topProductos,
+            ]);
+        })(),
         2 => view('empleado.dashboard', [
             'ventasHoy'              => Venta::whereDate('fecha', today())->where('estado', 'Completada')->sum('total'),
             'ventasHoyCount'         => Venta::whereDate('fecha', today())->where('estado', 'Completada')->count(),
@@ -69,110 +117,80 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__ . '/auth.php';
 
-Route::middleware('auth')->group(function () {
+// =========================================================================
+// Rutas exclusivas para el Administrador (rol_id = 1)
+// =========================================================================
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    // Gestión de usuarios y roles internos
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
     Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
     Route::patch('/usuarios/{usuario}/toggle-estado', [UsuarioController::class, 'toggleEstado'])->name('usuarios.toggle-estado');
+
+    // Informes financieros y exportación
+    Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
+    Route::get('/reportes/exportar/pdf', [ReporteController::class, 'exportarPdf'])->name('reportes.exportar.pdf');
+    Route::get('/reportes/exportar/excel', [ReporteController::class, 'exportarExcel'])->name('reportes.exportar.excel');
+
+    // Resolución de devoluciones (solo Admin)
+    Route::post('/devoluciones/{devolucion}/aprobar', [DevolucionController::class, 'aprobar'])->name('devoluciones.aprobar');
+    Route::post('/devoluciones/{devolucion}/rechazar', [DevolucionController::class, 'rechazar'])->name('devoluciones.rechazar');
 });
 
-Route::resource('categorias', CategoriaController::class)
-    ->middleware('auth');
+// =========================================================================
+// Rutas operativas para Administrador y Empleado/Vendedor (rol_id = 1 y 2)
+// =========================================================================
+Route::middleware(['auth', 'role:admin,vendedor'])->group(function () {
+    Route::resource('categorias', CategoriaController::class)->except(['create', 'show', 'edit']);
+    Route::resource('productos', ProductoController::class)->except(['create', 'edit']);
+    Route::patch('/productos/{producto}/toggle-estado', [ProductoController::class, 'toggleEstado'])->name('productos.toggle-estado');
 
-Route::resource('productos', ProductoController::class)
-    ->middleware('auth');
+    Route::resource('proveedores', ProveedorController::class)->parameters(['proveedores' => 'proveedor'])->except(['create', 'edit']);
+    Route::resource('compras', CompraController::class)->only(['index', 'store', 'show']);
 
-Route::patch('/productos/{producto}/toggle-estado', [ProductoController::class, 'toggleEstado'])
-    ->middleware('auth')
-    ->name('productos.toggle-estado');
+    Route::get('/ventas/buscar-cliente', [VentaController::class, 'buscarCliente'])->name('ventas.buscar-cliente');
 
-Route::resource('proveedores', ProveedorController::class)
-    ->middleware('auth');
+    // Caja y Arqueo
+    Route::get('/caja', [CajaController::class, 'index'])->name('caja.index');
+    Route::post('/caja/abrir', [CajaController::class, 'abrir'])->name('caja.abrir');
+    Route::post('/caja/cerrar', [CajaController::class, 'cerrar'])->name('caja.cerrar');
+    Route::post('/caja/movimiento', [CajaController::class, 'registrarMovimiento'])->name('caja.movimiento');
 
-Route::resource('compras', CompraController::class)
-    ->middleware('auth');
+    // Inventario y Kardex
+    Route::get('/inventario', [InventarioController::class, 'index'])->name('inventario.index');
 
-Route::get('/ventas/buscar-cliente', [VentaController::class, 'buscarCliente'])
-    ->middleware('auth')
-    ->name('ventas.buscar-cliente');
+    // Directorio de Clientes
+    Route::get('/clientes', [ClienteController::class, 'index'])->name('clientes.index');
+    Route::patch('/clientes/{cliente}/toggle-estado', [ClienteController::class, 'toggleEstado'])->name('clientes.toggle-estado');
+});
 
-Route::resource('ventas', VentaController::class)
-    ->middleware('auth');
+// =========================================================================
+// Rutas compartidas (Admin, Empleado y Cliente según su rol)
+// =========================================================================
+Route::middleware('auth')->group(function () {
+    Route::resource('ventas', VentaController::class)->only(['index', 'store', 'show']);
+    Route::get('/ventas/{venta}/comprobante', [VentaController::class, 'comprobante'])->name('ventas.comprobante');
+    Route::resource('devoluciones', DevolucionController::class)->parameters(['devoluciones' => 'devolucion'])->only(['index', 'store', 'show']);
 
-Route::post('/devoluciones/{devolucion}/aprobar', [DevolucionController::class, 'aprobar'])
-    ->middleware('auth')
-    ->name('devoluciones.aprobar');
+    Route::get('/clientes/{cliente}/compras', [ClienteController::class, 'compras'])->name('clientes.compras');
+    Route::get('/clientes/{cliente}/devoluciones', [ClienteController::class, 'devoluciones'])->name('clientes.devoluciones');
 
-Route::post('/devoluciones/{devolucion}/rechazar', [DevolucionController::class, 'rechazar'])
-    ->middleware('auth')
-    ->name('devoluciones.rechazar');
+    Route::get('/notificaciones', function() {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user instanceof \App\Models\User) {
+            return response()->json($user->unreadNotifications);
+        }
+        return response()->json([]);
+    })->name('notificaciones.index');
 
-Route::resource('devoluciones', DevolucionController::class)
-    ->middleware('auth');
-
-Route::get('/caja', [CajaController::class, 'index'])
-    ->middleware('auth')
-    ->name('caja.index');
-
-Route::post('/caja/abrir', [CajaController::class, 'abrir'])
-    ->middleware('auth')
-    ->name('caja.abrir');
-
-Route::post('/caja/cerrar', [CajaController::class, 'cerrar'])
-    ->middleware('auth')
-    ->name('caja.cerrar');
-
-Route::post('/caja/movimiento', [CajaController::class, 'registrarMovimiento'])
-    ->middleware('auth')
-    ->name('caja.movimiento');
-
-Route::get('/inventario', [InventarioController::class, 'index'])
-    ->middleware('auth')
-    ->name('inventario.index');
-
-Route::get('/clientes', [ClienteController::class, 'index'])
-    ->middleware('auth')
-    ->name('clientes.index');
-
-Route::patch('/clientes/{cliente}/toggle-estado', [ClienteController::class, 'toggleEstado'])
-    ->middleware('auth')
-    ->name('clientes.toggle-estado');
-
-Route::get('/clientes/{cliente}/compras', [ClienteController::class, 'compras'])
-    ->middleware('auth')
-    ->name('clientes.compras');
-
-Route::get('/clientes/{cliente}/devoluciones', [ClienteController::class, 'devoluciones'])
-    ->middleware('auth')
-    ->name('clientes.devoluciones');
-
-Route::get('/reportes', [ReporteController::class, 'index'])
-    ->middleware('auth')
-    ->name('reportes.index');
-
-Route::get('/reportes/exportar/pdf', [ReporteController::class, 'exportarPdf'])
-    ->middleware('auth')
-    ->name('reportes.exportar.pdf');
-
-Route::get('/reportes/exportar/excel', [ReporteController::class, 'exportarExcel'])
-    ->middleware('auth')
-    ->name('reportes.exportar.excel');
-
-Route::get('/notificaciones', function() {
-    $user = \Illuminate\Support\Facades\Auth::user();
-    if ($user instanceof \App\Models\User) {
-        return response()->json($user->unreadNotifications);
-    }
-    return response()->json([]);
-})->middleware('auth')->name('notificaciones.index');
-
-Route::post('/notificaciones/leer-todas', function() {
-    $user = \Illuminate\Support\Facades\Auth::user();
-    if ($user instanceof \App\Models\User) {
-        $user->unreadNotifications->markAsRead();
-    }
-    return response()->json(['ok' => true]);
-})->middleware('auth')->name('notificaciones.readAll');
+    Route::post('/notificaciones/leer-todas', function() {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user instanceof \App\Models\User) {
+            $user->unreadNotifications->markAsRead();
+        }
+        return response()->json(['ok' => true]);
+    })->name('notificaciones.readAll');
+});
 
 
 

@@ -8,8 +8,9 @@ class Rol extends Model //se define el modelo
 {
     protected $table = 'roles'; //nombre de la tabla en la bd
 
-    //atributos de la tabla  que se pueden modificar
+    //atributos de la tabla que se pueden modificar
     protected $fillable = [
+        'id',
         'descripcion',
     ];
 

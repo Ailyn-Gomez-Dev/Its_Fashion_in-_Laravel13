@@ -1,4 +1,4 @@
-@extends('layouts.Sidebarcliente')
+@extends('layouts.sidebarcliente')
 
 @section('titulo', 'Mis Compras')
 
@@ -51,9 +51,14 @@
                                     <span class="badge {{ $v->estado === 'Completada' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">{{ $v->estado }}</span>
                                 </td>
                                 <td class="px-6 py-4 border-b border-slate-50" onclick="event.stopPropagation()">
-                                    <button onclick="verDetalle({{ $v->id }})" class="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition" title="Ver detalle">
-                                        <i class="fas fa-eye text-xs"></i>
-                                    </button>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="verDetalle({{ $v->id }})" class="w-8 h-8 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center transition" title="Ver detalle">
+                                            <i class="fas fa-eye text-xs"></i>
+                                        </button>
+                                        <a href="{{ route('ventas.comprobante', $v->id) }}" target="_blank" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center transition" title="Ver Comprobante de Pago">
+                                            <i class="fas fa-print text-xs"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -163,6 +168,12 @@
 
         document.getElementById('modal-title').textContent = `Compra #${String(id).padStart(5, '0')}`;
         document.getElementById('modal-body').innerHTML = `
+            <div class="flex items-center justify-between p-3 mb-4 bg-slate-50 border border-slate-100 rounded-xl">
+                <span class="text-xs text-slate-500 font-medium">Comprobante oficial de compra</span>
+                <a href="${BASE_URL}/${id}/comprobante" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition shadow-sm">
+                    <i class="fas fa-print text-xs"></i> Ver Comprobante
+                </a>
+            </div>
             <div class="grid grid-cols-2 gap-3 mb-5 text-sm p-4 bg-slate-50 rounded-2xl">
                 <div><p class="text-xs text-slate-400 font-bold uppercase mb-0.5">Fecha</p><p class="font-semibold text-slate-800">${fecha}</p></div>
                 <div><p class="text-xs text-slate-400 font-bold uppercase mb-0.5">Método de pago</p><p class="font-semibold text-slate-800">${metodo}</p></div>

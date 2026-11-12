@@ -60,17 +60,31 @@ class CompraController extends Controller
 
         $items = json_decode($request->items, true);
 
-        if (empty($items)) {
-            if ($request->wantsJson()) {
-                return response()->json(['ok' => false, 'msg' => 'Agrega al menos un producto al detalle.']);
+        if (!is_array($items) || empty($items)) {
+            $msg = 'Agrega al menos un producto válido al detalle de la compra.';
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'msg' => $msg], 422)
+                : redirect()->back()->withErrors(['items' => $msg]);
+        }
+
+        // Validar integridad de cada ítem antes de iniciar la transacción
+        foreach ($items as $idx => $item) {
+            if (!is_array($item) ||
+                empty($item['id_producto']) ||
+                !isset($item['cantidad']) || (int)$item['cantidad'] <= 0 ||
+                !isset($item['precio_unitario']) || (float)$item['precio_unitario'] <= 0) {
+                $fila = $idx + 1;
+                $msg = "El producto en la fila {$fila} contiene datos inválidos. La cantidad y el costo deben ser mayores a cero.";
+                return $request->wantsJson()
+                    ? response()->json(['ok' => false, 'msg' => $msg], 422)
+                    : redirect()->back()->withErrors(['items' => $msg]);
             }
-            return redirect()->back()->withErrors(['items' => 'Agrega al menos un producto al detalle.']);
         }
 
         try {
             $idCompra = DB::transaction(function () use ($request, $items) {
                 // 1. Calcular el total global de la compra
-                $total = array_sum(array_map(fn($item) => $item['cantidad'] * $item['precio_unitario'], $items));
+                $total = array_sum(array_map(fn($item) => (int)$item['cantidad'] * (float)$item['precio_unitario'], $items));
 
                 // 2. Crear registro de compra
                 $compra = Compra::create([
@@ -82,24 +96,32 @@ class CompraController extends Controller
 
                 // 3. Procesar cada ítem del detalle
                 foreach ($items as $item) {
-                    $subtotal = $item['cantidad'] * $item['precio_unitario'];
+                    $productoId = (int)$item['id_producto'];
+                    $cantidad = (int)$item['cantidad'];
+                    $precioUnitario = (float)$item['precio_unitario'];
+                    $subtotal = round($cantidad * $precioUnitario, 2);
+
+                    // Bloquear producto para actualización concurrente
+                    $producto = Producto::lockForUpdate()->find($productoId);
+                    if (!$producto) {
+                        throw new \Exception("El producto con ID {$productoId} no fue encontrado.");
+                    }
 
                     // Guardar en detalle_compras
                     DetalleCompra::create([
                         'compra_id' => $compra->id,
-                        'producto_id' => $item['id_producto'],
-                        'cantidad' => $item['cantidad'],
-                        'precio_unitario' => $item['precio_unitario'],
+                        'producto_id' => $producto->id,
+                        'cantidad' => $cantidad,
+                        'precio_unitario' => $precioUnitario,
                         'subtotal' => $subtotal,
                     ]);
 
                     // Incrementar el stock del producto
-                    $producto = Producto::lockForUpdate()->find($item['id_producto']);
-                    $nuevoStock = $producto->stock + $item['cantidad'];
+                    $nuevoStock = (int)$producto->stock + $cantidad;
                     $producto->update(['stock' => $nuevoStock]);
 
                     // Registrar movimiento de Entrada en el Kardex (inventario)
-                    Inventario::registrarMovimiento($producto->id, 'Entrada', $nuevoStock, $item['cantidad']);
+                    Inventario::registrarMovimiento($producto->id, 'Entrada', $nuevoStock, $cantidad);
                 }
 
                 return $compra->id;

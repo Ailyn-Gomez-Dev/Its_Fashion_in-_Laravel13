@@ -6,49 +6,62 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable; //se importa el modelo
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var list<string> //atributos de la tabla que se pueden modificar
+     * @var list<string>
      */
     protected $fillable = [
         'nombre',
         'apellido',
+        'documento',
         'username',
         'telefono',
         'email',
         'password',
         'rol_id',
+        'puede_operar_caja',
         'estado',
         'fecha_registro',
     ];
 
     /**
+     * The model's default values for attributes.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'puede_operar_caja' => true,
+    ];
+
+    /**
      * The attributes that should be hidden for serialization.
      *
-     * @var list<string> //atributos que se ocultan
+     * @var list<string>
      */
     protected $hidden = [
-        'password', //se oculta la contraseña
-        'remember_token', //se oculta el token
+        'password',
+        'remember_token',
     ];
 
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string> //atributos que se transforman
+     * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime', //se transforma a datetime
-            'fecha_registro' => 'datetime', //se transforma a datetime
-            'password' => 'hashed', //se transforma a hashed
+            'email_verified_at' => 'datetime',
+            'fecha_registro' => 'datetime',
+            'password' => 'hashed',
+            'puede_operar_caja' => 'boolean',
         ];
     }
 
@@ -57,7 +70,7 @@ class User extends Authenticatable
      */
     public function rol()
     {
-        return $this->belongsTo(Rol::class); //se especifica el id de la tabla usuarios para que sepa que campo comparar
+        return $this->belongsTo(Rol::class, 'rol_id');
     }
 
     /**
@@ -74,5 +87,13 @@ class User extends Authenticatable
     public function devoluciones()
     {
         return $this->hasManyThrough(Devolucion::class, Venta::class, 'cliente_id', 'venta_id', 'id', 'id');
+    }
+
+    /**
+     * Accesor para nombre completo compatible con interfaces estándar.
+     */
+    public function getNameAttribute(): string
+    {
+        return trim("{$this->nombre} {$this->apellido}");
     }
 }

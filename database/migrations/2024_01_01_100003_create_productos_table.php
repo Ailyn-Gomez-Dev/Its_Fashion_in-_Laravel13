@@ -35,6 +35,8 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->nullOnDelete();
 
+            $table->string('imagen', 500)->nullable();
+
             // FECHAS
             $table->timestamps();
         });

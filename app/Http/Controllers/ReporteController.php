@@ -48,6 +48,9 @@ class ReporteController extends Controller
             $periodo = 'Personalizado';
         }
 
+        $desdeInicio = "{$desde} 00:00:00";
+        $hastaFin = "{$hasta} 23:59:59";
+
         // 1. Ventas del período por día o mes (para la gráfica principal)
         $diff = (strtotime($hasta) - strtotime($desde)) / 86400;
         $ventas_semana = [];
@@ -57,7 +60,7 @@ class ReporteController extends Controller
         if ($diff <= 31) {
             $rows = Venta::select(DB::raw('DATE(fecha) as punto'), DB::raw('SUM(total) as total'))
                 ->where('estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+                ->whereBetween('fecha', [$desdeInicio, $hastaFin])
                 ->groupBy(DB::raw('DATE(fecha)'))
                 ->orderBy('punto', 'asc')
                 ->get()
@@ -71,9 +74,12 @@ class ReporteController extends Controller
             }
             $label_grafica = "Ventas por día";
         } else {
-            $rows = Venta::select(DB::raw("DATE_FORMAT(fecha, '%Y-%m') as punto"), DB::raw('SUM(total) as total'))
+            $driver = DB::connection()->getDriverName();
+            $dateMonthExpr = $driver === 'sqlite' ? "strftime('%Y-%m', fecha)" : "DATE_FORMAT(fecha, '%Y-%m')";
+
+            $rows = Venta::select(DB::raw("{$dateMonthExpr} as punto"), DB::raw('SUM(total) as total'))
                 ->where('estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+                ->whereBetween('fecha', [$desdeInicio, $hastaFin])
                 ->groupBy('punto')
                 ->orderBy('punto', 'asc')
                 ->get()
@@ -95,7 +101,10 @@ class ReporteController extends Controller
         }
 
         // 2. Ventas últimos 6 meses (para tendencia)
-        $rows2 = Venta::select(DB::raw("DATE_FORMAT(fecha, '%Y-%m') as mes"), DB::raw('SUM(total) as total'))
+        $driver = DB::connection()->getDriverName();
+        $dateMonthExpr = $driver === 'sqlite' ? "strftime('%Y-%m', fecha)" : "DATE_FORMAT(fecha, '%Y-%m')";
+
+        $rows2 = Venta::select(DB::raw("{$dateMonthExpr} as mes"), DB::raw('SUM(total) as total'))
             ->where('estado', 'Completada')
             ->where('fecha', '>=', now()->subMonths(5)->startOfMonth())
             ->groupBy('mes')
@@ -118,15 +127,15 @@ class ReporteController extends Controller
                 DB::raw('COUNT(*) as transacciones'),
                 DB::raw('COALESCE(AVG(total), 0) as ticket_promedio'),
                 DB::raw("COALESCE(SUM(CASE WHEN metodo_pago='Efectivo' THEN total ELSE 0 END), 0) as efectivo"),
-                DB::raw("COALESCE(SUM(CASE WHEN metodo_pago='Transferencia' THEN total ELSE 0 END), 0) as transferencia")
+                DB::raw("COALESCE(SUM(CASE WHEN metodo_pago LIKE 'Transferencia%' THEN total ELSE 0 END), 0) as transferencia")
             )
             ->where('estado', 'Completada')
-            ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+            ->whereBetween('fecha', [$desdeInicio, $hastaFin])
             ->first();
 
         // 4. Clientes únicos activos
         $total_clientes = Venta::where('estado', 'Completada')
-            ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+            ->whereBetween('fecha', [$desdeInicio, $hastaFin])
             ->distinct('cliente_id')
             ->count('cliente_id');
 
@@ -138,7 +147,7 @@ class ReporteController extends Controller
             ->join('productos', 'productos.id', '=', 'detalle_ventas.producto_id')
             ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
             ->where('ventas.estado', 'Completada')
-            ->whereBetween(DB::raw('DATE(ventas.fecha)'), [$desde, $hasta])
+            ->whereBetween('ventas.fecha', [$desdeInicio, $hastaFin])
             ->groupBy('detalle_ventas.producto_id', 'productos.nombre', 'productos.talla', 'productos.color')
             ->orderBy('vendidos', 'desc')
             ->limit(5)
@@ -148,7 +157,7 @@ class ReporteController extends Controller
         $devols = Devolucion::select('devoluciones.*', 'users.nombre as cliente_nombre', 'users.apellido as cliente_apellido')
             ->join('ventas', 'ventas.id', '=', 'devoluciones.venta_id')
             ->leftJoin('users', 'users.id', '=', 'ventas.cliente_id')
-            ->whereBetween(DB::raw('DATE(devoluciones.fecha)'), [$desde, $hasta])
+            ->whereBetween('devoluciones.fecha', [$desdeInicio, $hastaFin])
             ->orderBy('devoluciones.fecha', 'desc')
             ->limit(8)
             ->get();
@@ -158,7 +167,7 @@ class ReporteController extends Controller
 
         // 8. Compras/Abastecimiento del período para Reportes de Proveedor (Escenario 3)
         $comprasPeriodo = \App\Models\Compra::with(['proveedor', 'usuario'])
-            ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+            ->whereBetween('fecha', [$desdeInicio, $hastaFin])
             ->orderBy('fecha', 'desc')
             ->get();
 
@@ -183,6 +192,8 @@ class ReporteController extends Controller
 
         $desde = $request->get('desde', now()->subDays(6)->format('Y-m-d'));
         $hasta = $request->get('hasta', now()->format('Y-m-d'));
+        $desdeInicio = "{$desde} 00:00:00";
+        $hastaFin = "{$hasta} 23:59:59";
 
         // Si no hay nada seleccionado, por defecto mostramos todo
         if (!$incluirVentas && !$incluirInventario && !$incluirProductos && !$incluirDevoluciones) {
@@ -198,7 +209,7 @@ class ReporteController extends Controller
         if ($incluirVentas) {
             $ventas = Venta::with('cliente')
                 ->where('estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+                ->whereBetween('fecha', [$desdeInicio, $hastaFin])
                 ->orderBy('fecha', 'desc')
                 ->get();
 
@@ -207,10 +218,10 @@ class ReporteController extends Controller
                     DB::raw('COUNT(*) as transacciones'),
                     DB::raw('COALESCE(AVG(total), 0) as ticket_promedio'),
                     DB::raw("COALESCE(SUM(CASE WHEN metodo_pago='Efectivo' THEN total ELSE 0 END), 0) as efectivo"),
-                    DB::raw("COALESCE(SUM(CASE WHEN metodo_pago='Transferencia' THEN total ELSE 0 END), 0) as transferencia")
+                    DB::raw("COALESCE(SUM(CASE WHEN metodo_pago LIKE 'Transferencia%' THEN total ELSE 0 END), 0) as transferencia")
                 )
                 ->where('estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+                ->whereBetween('fecha', [$desdeInicio, $hastaFin])
                 ->first();
         }
 
@@ -228,7 +239,7 @@ class ReporteController extends Controller
                 ->join('productos', 'productos.id', '=', 'detalle_ventas.producto_id')
                 ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
                 ->where('ventas.estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(ventas.fecha)'), [$desde, $hasta])
+                ->whereBetween('ventas.fecha', [$desdeInicio, $hastaFin])
                 ->groupBy('detalle_ventas.producto_id', 'productos.nombre', 'productos.talla', 'productos.color')
                 ->orderBy('vendidos', 'desc')
                 ->get();
@@ -239,7 +250,7 @@ class ReporteController extends Controller
             $devoluciones = Devolucion::select('devoluciones.*', 'users.nombre as cliente_nombre', 'users.apellido as cliente_apellido')
                 ->join('ventas', 'ventas.id', '=', 'devoluciones.venta_id')
                 ->leftJoin('users', 'users.id', '=', 'ventas.cliente_id')
-                ->whereBetween(DB::raw('DATE(devoluciones.fecha)'), [$desde, $hasta])
+                ->whereBetween('devoluciones.fecha', [$desdeInicio, $hastaFin])
                 ->orderBy('devoluciones.fecha', 'desc')
                 ->get();
         }
@@ -287,6 +298,8 @@ class ReporteController extends Controller
 
         $desde = $request->get('desde', now()->subDays(6)->format('Y-m-d'));
         $hasta = $request->get('hasta', now()->format('Y-m-d'));
+        $desdeInicio = "{$desde} 00:00:00";
+        $hastaFin = "{$hasta} 23:59:59";
 
         if (!$incluirVentas && !$incluirInventario && !$incluirProductos && !$incluirDevoluciones) {
             $incluirVentas = true;
@@ -301,7 +314,7 @@ class ReporteController extends Controller
         if ($incluirVentas) {
             $ventas = Venta::with('cliente')
                 ->where('estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+                ->whereBetween('fecha', [$desdeInicio, $hastaFin])
                 ->orderBy('fecha', 'desc')
                 ->get();
 
@@ -310,10 +323,10 @@ class ReporteController extends Controller
                     DB::raw('COUNT(*) as transacciones'),
                     DB::raw('COALESCE(AVG(total), 0) as ticket_promedio'),
                     DB::raw("COALESCE(SUM(CASE WHEN metodo_pago='Efectivo' THEN total ELSE 0 END), 0) as efectivo"),
-                    DB::raw("COALESCE(SUM(CASE WHEN metodo_pago='Transferencia' THEN total ELSE 0 END), 0) as transferencia")
+                    DB::raw("COALESCE(SUM(CASE WHEN metodo_pago LIKE 'Transferencia%' THEN total ELSE 0 END), 0) as transferencia")
                 )
                 ->where('estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(fecha)'), [$desde, $hasta])
+                ->whereBetween('fecha', [$desdeInicio, $hastaFin])
                 ->first();
         }
 
@@ -331,7 +344,7 @@ class ReporteController extends Controller
                 ->join('productos', 'productos.id', '=', 'detalle_ventas.producto_id')
                 ->join('ventas', 'ventas.id', '=', 'detalle_ventas.venta_id')
                 ->where('ventas.estado', 'Completada')
-                ->whereBetween(DB::raw('DATE(ventas.fecha)'), [$desde, $hasta])
+                ->whereBetween('ventas.fecha', [$desdeInicio, $hastaFin])
                 ->groupBy('detalle_ventas.producto_id', 'productos.nombre', 'productos.talla', 'productos.color')
                 ->orderBy('vendidos', 'desc')
                 ->get();
@@ -342,7 +355,7 @@ class ReporteController extends Controller
             $devoluciones = Devolucion::select('devoluciones.*', 'users.nombre as cliente_nombre', 'users.apellido as cliente_apellido')
                 ->join('ventas', 'ventas.id', '=', 'devoluciones.venta_id')
                 ->leftJoin('users', 'users.id', '=', 'ventas.cliente_id')
-                ->whereBetween(DB::raw('DATE(devoluciones.fecha)'), [$desde, $hasta])
+                ->whereBetween('devoluciones.fecha', [$desdeInicio, $hastaFin])
                 ->orderBy('devoluciones.fecha', 'desc')
                 ->get();
         }

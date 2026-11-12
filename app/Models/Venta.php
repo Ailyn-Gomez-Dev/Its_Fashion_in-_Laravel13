@@ -52,4 +52,12 @@ class Venta extends Model
     {
         return $this->hasMany(DetalleVenta::class, 'venta_id');
     }
+
+    /**
+     * Relación: Una venta puede tener muchas devoluciones.
+     */
+    public function devoluciones()
+    {
+        return $this->hasMany(Devolucion::class, 'venta_id');
+    }
 }

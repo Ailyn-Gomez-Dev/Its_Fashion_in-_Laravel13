@@ -24,11 +24,13 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'nombre' => 'Admin',
             'apellido' => 'General',
+            'documento' => '1000000001',
             'username' => 'admin',
             'telefono' => '123456789',
             'email' => 'admin@gmail.com',
             'password' => Hash::make('admin123'),
             'rol_id' => 1,
+            'puede_operar_caja' => true,
             'estado' => 'Activo',
         ]);
 
@@ -36,11 +38,13 @@ class DatabaseSeeder extends Seeder
         $vendedor = User::create([
             'nombre' => 'Juan',
             'apellido' => 'Pérez',
+            'documento' => '1000000002',
             'username' => 'juanvendedor',
             'telefono' => '987654321',
             'email' => 'juan@gmail.com',
             'password' => Hash::make('vendedor123'),
             'rol_id' => 2,
+            'puede_operar_caja' => true,
             'estado' => 'Activo',
         ]);
 
@@ -48,11 +52,13 @@ class DatabaseSeeder extends Seeder
         $cliente = User::create([
             'nombre' => 'Ailyn',
             'apellido' => 'Gomez',
+            'documento' => '1076984253',
             'username' => 'ailyncliente',
             'telefono' => '3223945112',
             'email' => 'ailyngomez.2811@gmail.com',
             'password' => Hash::make('cliente123'),
             'rol_id' => 3,
+            'puede_operar_caja' => false,
             'estado' => 'Activo',
         ]);
 
@@ -98,7 +104,8 @@ class DatabaseSeeder extends Seeder
             'talla' => 'M',
             'color' => 'Azul Oscuro',
             'estado' => 'Activo',
-            'categoria_id' => $catJeans->id
+            'categoria_id' => $catJeans->id,
+            'imagen' => 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodCamisetaAlgodon = \App\Models\Producto::create([
@@ -111,7 +118,8 @@ class DatabaseSeeder extends Seeder
             'talla' => 'S',
             'color' => 'Blanco',
             'estado' => 'Activo',
-            'categoria_id' => $catCamisetas->id
+            'categoria_id' => $catCamisetas->id,
+            'imagen' => 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodVestidoFloral = \App\Models\Producto::create([
@@ -124,7 +132,8 @@ class DatabaseSeeder extends Seeder
             'talla' => 'M',
             'color' => 'Rojo',
             'estado' => 'Activo',
-            'categoria_id' => $catVestidos->id
+            'categoria_id' => $catVestidos->id,
+            'imagen' => 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodChaquetaCuero = \App\Models\Producto::create([
@@ -137,7 +146,8 @@ class DatabaseSeeder extends Seeder
             'talla' => 'L',
             'color' => 'Negro',
             'estado' => 'Activo',
-            'categoria_id' => $catChaquetas->id
+            'categoria_id' => $catChaquetas->id,
+            'imagen' => 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodTenisRunning = \App\Models\Producto::create([
@@ -150,7 +160,8 @@ class DatabaseSeeder extends Seeder
             'talla' => '38',
             'color' => 'Blanco/Azul',
             'estado' => 'Activo',
-            'categoria_id' => $catCalzado->id
+            'categoria_id' => $catCalzado->id,
+            'imagen' => 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodBotasCuero = \App\Models\Producto::create([
@@ -163,7 +174,8 @@ class DatabaseSeeder extends Seeder
             'talla' => '40',
             'color' => 'Café',
             'estado' => 'Activo',
-            'categoria_id' => $catCalzado->id
+            'categoria_id' => $catCalzado->id,
+            'imagen' => 'https://images.unsplash.com/photo-1520639888713-7851133b1ed0?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodGafasRetro = \App\Models\Producto::create([
@@ -176,7 +188,8 @@ class DatabaseSeeder extends Seeder
             'talla' => 'Única',
             'color' => 'Marrón',
             'estado' => 'Activo',
-            'categoria_id' => $catAccesorios->id
+            'categoria_id' => $catAccesorios->id,
+            'imagen' => 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=600&q=80',
         ]);
 
         $prodCinturonCuero = \App\Models\Producto::create([
@@ -189,7 +202,8 @@ class DatabaseSeeder extends Seeder
             'talla' => '32',
             'color' => 'Negro/Marrón',
             'estado' => 'Activo',
-            'categoria_id' => $catAccesorios->id
+            'categoria_id' => $catAccesorios->id,
+            'imagen' => 'https://images.unsplash.com/photo-1624222247344-550fb60583dc?auto=format&fit=crop&w=600&q=80',
         ]);
 
         // 3. PROVEEDORES

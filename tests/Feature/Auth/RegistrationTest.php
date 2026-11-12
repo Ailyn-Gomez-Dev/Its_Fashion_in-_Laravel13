@@ -19,13 +19,22 @@ class RegistrationTest extends TestCase
     public function test_new_users_can_register(): void
     {
         $response = $this->post('/register', [
-            'name' => 'Test User',
+            'nombre' => 'Test',
+            'apellido' => 'User',
+            'username' => 'testuser99',
+            'documento' => '1020304050',
+            'telefono' => '3001234567',
             'email' => 'test@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ]);
 
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertRedirect(route('login'));
+        $this->assertDatabaseHas('users', [
+            'username' => 'testuser99',
+            'email' => 'test@example.com',
+            'rol_id' => 3,
+            'estado' => 'Activo',
+        ]);
     }
 }
