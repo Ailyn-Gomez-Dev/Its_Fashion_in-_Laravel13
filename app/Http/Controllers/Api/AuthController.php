@@ -163,6 +163,59 @@ class AuthController extends Controller
     }
 
     /**
+     * Actualizar perfil del usuario autenticado.
+     * PUT/PATCH /api/user
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'nombre'           => ['required', 'string', 'max:100'],
+            'apellido'         => ['required', 'string', 'max:100'],
+            'telefono'         => ['required', 'string', 'max:15'],
+            'current_password' => ['nullable', 'required_with:new_password', 'string'],
+            'new_password'     => ['nullable', 'string', 'min:6', 'confirmed'],
+        ], [
+            'nombre.required'   => 'El nombre es obligatorio.',
+            'apellido.required' => 'El apellido es obligatorio.',
+            'telefono.required' => 'El teléfono es obligatorio.',
+            'new_password.min'  => 'La nueva contraseña debe tener al menos 6 caracteres.',
+            'new_password.confirmed' => 'La confirmación de la nueva contraseña no coincide.',
+        ]);
+
+        if (!empty($validated['new_password'])) {
+            if (!Hash::check($validated['current_password'], $user->password)) {
+                return response()->json([
+                    'message' => 'La contraseña actual ingresada es incorrecta.',
+                    'errors'  => ['current_password' => ['Contraseña actual inválida.']],
+                ], 422);
+            }
+            $user->password = Hash::make($validated['new_password']);
+        }
+
+        $user->nombre   = trim($validated['nombre']);
+        $user->apellido = trim($validated['apellido']);
+        $user->telefono = trim($validated['telefono']);
+        $user->save();
+
+        return response()->json([
+            'message' => 'Perfil actualizado exitosamente.',
+            'user'    => [
+                'id'        => $user->id,
+                'nombre'    => $user->nombre,
+                'apellido'  => $user->apellido,
+                'username'  => $user->username,
+                'email'     => $user->email,
+                'telefono'  => $user->telefono,
+                'rol_id'    => $user->rol_id,
+                'rol'       => $user->rol?->descripcion ?? 'cliente',
+                'estado'    => $user->estado,
+            ],
+        ]);
+    }
+
+    /**
      * Cierre de sesión y revocación del token Sanctum.
      * POST /api/logout
      */

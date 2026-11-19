@@ -46,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 1. Sesión y Perfil
     Route::get('/user', [AuthController::class, 'user']);
+    Route::match(['PUT', 'POST', 'PATCH'], '/user', [AuthController::class, 'updateProfile']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // 2. Dashboard y KPIs según rol (Admin, Empleado/Vendedor, Cliente)
@@ -54,17 +55,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // 3. Ventas y Punto de Venta (POS) / Compras de Cliente
     Route::get('/ventas', [VentaApiController::class, 'index']);
     Route::post('/ventas', [VentaApiController::class, 'store']);
+    Route::get('/ventas/buscar-cliente', [VentaApiController::class, 'buscarCliente']);
     Route::get('/ventas/{id}', [VentaApiController::class, 'show']);
+    Route::get('/ventas/{id}/comprobante', [VentaApiController::class, 'comprobante']);
 
     // 4. Operaciones Operativas de Boutique (Admin y Vendedor)
     Route::middleware('role:admin,vendedor')->group(function () {
-        // Productos y Categorías
+        // Productos y Categorías (CRUD completo)
         Route::post('/products', [ProductoApiController::class, 'store']);
         Route::match(['PUT', 'POST', 'PATCH'], '/products/{id}', [ProductoApiController::class, 'update']);
         Route::match(['POST', 'PATCH'], '/products/{id}/toggle-estado', [ProductoApiController::class, 'toggleEstado']);
         Route::delete('/products/{id}', [ProductoApiController::class, 'destroy']);
         Route::post('/products/{id}/adjust-stock', [ProductoApiController::class, 'adjustStock']);
         Route::post('/categories', [ProductoApiController::class, 'storeCategoria']);
+        Route::match(['PUT', 'POST', 'PATCH'], '/categories/{id}', [ProductoApiController::class, 'updateCategoria']);
+        Route::delete('/categories/{id}', [ProductoApiController::class, 'destroyCategoria']);
 
         // Turnos y Movimientos de Caja
         Route::get('/caja', [CajaApiController::class, 'index']);
@@ -76,6 +81,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/clientes', [ClienteApiController::class, 'index']);
         Route::post('/clientes', [ClienteApiController::class, 'store']);
         Route::get('/clientes/{id}', [ClienteApiController::class, 'show']);
+        Route::get('/clientes/{id}/compras', [ClienteApiController::class, 'compras']);
+        Route::get('/clientes/{id}/devoluciones', [ClienteApiController::class, 'devoluciones']);
 
         // Proveedores de Mercancía
         Route::get('/proveedores', [ProveedorApiController::class, 'index']);

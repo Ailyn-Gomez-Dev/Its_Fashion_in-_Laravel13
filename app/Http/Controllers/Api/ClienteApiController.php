@@ -124,4 +124,44 @@ class ClienteApiController extends Controller
             'nuevo_estado' => $nuevoEstado,
         ]);
     }
+
+    /**
+     * Historial de compras de un cliente específico.
+     * GET /api/clientes/{id}/compras
+     */
+    public function compras($id)
+    {
+        $cliente = User::where('rol_id', 3)->findOrFail($id);
+
+        $compras = Venta::with(['detalles.producto'])
+            ->where('cliente_id', $cliente->id)
+            ->orderBy('fecha', 'desc')
+            ->paginate(15);
+
+        return response()->json([
+            'success' => true,
+            'cliente' => $cliente->only(['id', 'nombre', 'apellido', 'username']),
+            'data'    => $compras,
+        ]);
+    }
+
+    /**
+     * Historial de devoluciones de un cliente específico.
+     * GET /api/clientes/{id}/devoluciones
+     */
+    public function devoluciones($id)
+    {
+        $cliente = User::where('rol_id', 3)->findOrFail($id);
+
+        $devoluciones = \App\Models\Devolucion::with(['venta', 'detalles.producto'])
+            ->where('cliente_id', $cliente->id)
+            ->orderBy('fecha_solicitud', 'desc')
+            ->paginate(15);
+
+        return response()->json([
+            'success' => true,
+            'cliente' => $cliente->only(['id', 'nombre', 'apellido', 'username']),
+            'data'    => $devoluciones,
+        ]);
+    }
 }

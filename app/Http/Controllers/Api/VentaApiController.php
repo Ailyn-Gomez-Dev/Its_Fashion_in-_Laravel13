@@ -246,4 +246,95 @@ class VentaApiController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * Búsqueda rápida de clientes para el POS móvil.
+     * GET /api/ventas/buscar-cliente
+     */
+    public function buscarCliente(Request $request)
+    {
+        $q = trim($request->get('q', ''));
+
+        if (strlen($q) < 2) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $clientes = User::where('rol_id', 3)
+            ->where('estado', 'Activo')
+            ->where(function ($query) use ($q) {
+                $query->where('nombre', 'like', "%{$q}%")
+                      ->orWhere('apellido', 'like', "%{$q}%")
+                      ->orWhere('documento', 'like', "%{$q}%")
+                      ->orWhere('username', 'like', "%{$q}%")
+                      ->orWhere('telefono', 'like', "%{$q}%");
+            })
+            ->select('id', 'nombre', 'apellido', 'documento', 'username', 'telefono', 'email')
+            ->take(10)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $clientes,
+        ]);
+    }
+
+    /**
+     * Datos estructurados del comprobante / ticket de venta para Flutter.
+     * GET /api/ventas/{id}/comprobante
+     */
+    public function comprobante(Request $request, $id)
+    {
+        $user = $request->user();
+        $venta = Venta::with(['cliente', 'usuario', 'detalles.producto.categoria'])->findOrFail($id);
+
+        if ((int)$user->rol_id === 3 && (int)$venta->cliente_id !== (int)$user->id) {
+            return response()->json(['success' => false, 'message' => 'No autorizado.'], 403);
+        }
+
+        $ticket = [
+            'empresa' => [
+                'nombre'    => "It's Fashion Boutique",
+                'nit'       => '900.123.456-7',
+                'direccion' => 'Calle Principal #123, Bogotá, Colombia',
+                'telefono'  => '+57 300 123 4567',
+                'email'     => 'info@itsfashion.com',
+            ],
+            'venta' => [
+                'id'             => $venta->id,
+                'numero_factura' => 'FAC-' . str_pad($venta->id, 6, '0', STR_PAD_LEFT),
+                'fecha'          => $venta->fecha,
+                'metodo_pago'    => $venta->metodo_pago,
+                'estado'         => $venta->estado,
+                'total'          => (float)$venta->total,
+                'vendedor'       => $venta->usuario ? "{$venta->usuario->nombre} {$venta->usuario->apellido}" : 'Venta en línea',
+            ],
+            'cliente' => $venta->cliente ? [
+                'nombre'    => "{$venta->cliente->nombre} {$venta->cliente->apellido}",
+                'documento' => $venta->cliente->documento ?? 'Consumidor Final',
+                'telefono'  => $venta->cliente->telefono ?? 'N/A',
+                'email'     => $venta->cliente->email ?? 'N/A',
+            ] : [
+                'nombre'    => 'Cliente General / Consumidor Final',
+                'documento' => '222222222222',
+            ],
+            'items' => $venta->detalles->map(function ($det) {
+                return [
+                    'producto_id'     => $det->producto_id,
+                    'codigo'          => $det->producto?->codigo ?? 'N/A',
+                    'nombre'          => $det->producto?->nombre ?? 'Producto',
+                    'talla'           => $det->producto?->talla ?? '',
+                    'color'           => $det->producto?->color ?? '',
+                    'cantidad'        => (int)$det->cantidad,
+                    'precio_unitario' => (float)$det->precio_unitario,
+                    'subtotal'        => (float)$det->subtotal,
+                ];
+            }),
+            'url_comprobante_web' => url("/ventas/{$venta->id}/comprobante"),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'ticket'  => $ticket,
+        ]);
+    }
 }

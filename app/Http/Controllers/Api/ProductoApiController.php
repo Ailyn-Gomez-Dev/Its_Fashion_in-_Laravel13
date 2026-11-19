@@ -104,6 +104,60 @@ class ProductoApiController extends Controller
     }
 
     /**
+     * Actualizar una categoría.
+     * PUT/PATCH /api/categories/{id}
+     */
+    public function updateCategoria(Request $request, $id)
+    {
+        $categoria = Categoria::find($id);
+        if (!$categoria) {
+            return response()->json(['success' => false, 'message' => 'Categoría no encontrada.'], 404);
+        }
+
+        $validated = $request->validate([
+            'nombre'      => ['required', 'string', 'max:100', \Illuminate\Validation\Rule::unique('categorias', 'nombre')->ignore($categoria->id)],
+            'descripcion' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $categoria->update([
+            'nombre'      => trim($validated['nombre']),
+            'descripcion' => trim($validated['descripcion'] ?? ''),
+        ]);
+
+        return response()->json([
+            'success'   => true,
+            'message'   => 'Categoría actualizada exitosamente.',
+            'categoria' => $categoria,
+        ]);
+    }
+
+    /**
+     * Eliminar una categoría (si no tiene productos asociados).
+     * DELETE /api/categories/{id}
+     */
+    public function destroyCategoria($id)
+    {
+        $categoria = Categoria::withCount('productos')->find($id);
+        if (!$categoria) {
+            return response()->json(['success' => false, 'message' => 'Categoría no encontrada.'], 404);
+        }
+
+        if ($categoria->productos_count > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede eliminar la categoría porque tiene productos asignados.',
+            ], 422);
+        }
+
+        $categoria->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Categoría eliminada exitosamente.',
+        ]);
+    }
+
+    /**
      * Registro de nuevo producto desde el móvil (Administrador/Vendedor).
      * POST /api/products
      */
