@@ -8,6 +8,7 @@ description = "Its Fashion Laravel Application"
 
 [fs]
 "/app/" = "."
+"/app/public/storage" = "storage/app/public"
 
 [[command]]
 name = "run"
