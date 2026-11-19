@@ -1,12 +1,13 @@
 [package]
 name = "ailyn-gomez-dev/its-fashion"
-version = "0.1.0"
+version = "0.1.2"
 description = "Its Fashion Laravel Application"
 
 [dependencies]
 "php/php" = "=8.3.4"
 
 [fs]
+"/app/.env" = ".env"
 "/app/app" = "app"
 "/app/bootstrap" = "bootstrap"
 "/app/config" = "config"

@@ -2,3 +2,12 @@ kind: wasmer.io/App.v0
 name: its-fashion
 owner: ailyn-gomez-dev
 package: .
+app_id: da_RvJI4t0UAz7V
+env:
+  APP_DEBUG: "true"
+  APP_ENV: "local"
+  APP_KEY: "base64:5SF2KPZ4+8QSNxHpzm6J0Xq3AUMOHCr9D53CQheDrkM="
+  LOG_CHANNEL: "stderr"
+  DB_CONNECTION: "sqlite"
+  SESSION_DRIVER: "cookie"
+  CACHE_STORE: "array"
