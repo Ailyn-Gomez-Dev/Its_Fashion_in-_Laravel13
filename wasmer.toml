@@ -1,6 +1,6 @@
 [package]
 name = "ailyn-gomez-dev/its-fashion"
-version = "0.1.2"
+version = "0.1.3"
 description = "Its Fashion Laravel Application"
 
 [dependencies]

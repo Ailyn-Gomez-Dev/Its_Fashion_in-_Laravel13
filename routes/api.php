@@ -9,10 +9,15 @@ use App\Http\Controllers\Api\CajaApiController;
 use App\Http\Controllers\Api\ClienteApiController;
 use App\Http\Controllers\Api\DevolucionApiController;
 use App\Http\Controllers\Api\NotificacionApiController;
+use App\Http\Controllers\Api\ProveedorApiController;
+use App\Http\Controllers\Api\CompraApiController;
+use App\Http\Controllers\Api\UsuarioApiController;
+use App\Http\Controllers\Api\InventarioApiController;
+use App\Http\Controllers\Api\ReporteApiController;
 
 /*
 |--------------------------------------------------------------------------
-| Rutas API - It's Fashion Sistema Completo Móvil & Web
+| Rutas API - It's Fashion Sistema Completo 100% Móvil & Web
 |--------------------------------------------------------------------------
 */
 
@@ -51,8 +56,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/ventas', [VentaApiController::class, 'store']);
     Route::get('/ventas/{id}', [VentaApiController::class, 'show']);
 
-    // 4. Gestión administrativa y operativa de Catálogo e Inventario (Admin y Vendedor)
+    // 4. Operaciones Operativas de Boutique (Admin y Vendedor)
     Route::middleware('role:admin,vendedor')->group(function () {
+        // Productos y Categorías
         Route::post('/products', [ProductoApiController::class, 'store']);
         Route::match(['PUT', 'POST', 'PATCH'], '/products/{id}', [ProductoApiController::class, 'update']);
         Route::match(['POST', 'PATCH'], '/products/{id}/toggle-estado', [ProductoApiController::class, 'toggleEstado']);
@@ -66,17 +72,49 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/caja/cerrar', [CajaApiController::class, 'cerrar']);
         Route::post('/caja/movimiento', [CajaApiController::class, 'registrarMovimiento']);
 
-        // Directorio de Clientes (consulta y registro desde POS móvil)
+        // Directorio de Clientes
         Route::get('/clientes', [ClienteApiController::class, 'index']);
         Route::post('/clientes', [ClienteApiController::class, 'store']);
         Route::get('/clientes/{id}', [ClienteApiController::class, 'show']);
+
+        // Proveedores de Mercancía
+        Route::get('/proveedores', [ProveedorApiController::class, 'index']);
+        Route::post('/proveedores', [ProveedorApiController::class, 'store']);
+        Route::get('/proveedores/{id}', [ProveedorApiController::class, 'show']);
+        Route::match(['PUT', 'POST', 'PATCH'], '/proveedores/{id}', [ProveedorApiController::class, 'update']);
+        Route::delete('/proveedores/{id}', [ProveedorApiController::class, 'destroy']);
+
+        // Compras de Mercancía / Abastecimiento
+        Route::get('/compras', [CompraApiController::class, 'index']);
+        Route::post('/compras', [CompraApiController::class, 'store']);
+        Route::get('/compras/{id}', [CompraApiController::class, 'show']);
+
+        // Kardex y Movimientos de Inventario
+        Route::get('/inventario', [InventarioApiController::class, 'index']);
+        Route::get('/inventario/kpis', [InventarioApiController::class, 'kpis']);
     });
 
-    // 5. Operaciones de Cliente / Estado (Solo Administrador)
+    // 5. Operaciones de Administración Avanzada (Solo Administrador)
     Route::middleware('role:admin')->group(function () {
+        // Gestión de Clientes
         Route::match(['POST', 'PATCH'], '/clientes/{id}/toggle-estado', [ClienteApiController::class, 'toggleEstado']);
+
+        // Aprobación / Rechazo de Devoluciones
         Route::post('/devoluciones/{id}/aprobar', [DevolucionApiController::class, 'aprobar']);
         Route::post('/devoluciones/{id}/rechazar', [DevolucionApiController::class, 'rechazar']);
+
+        // Gestión de Empleados y Usuarios del Sistema
+        Route::get('/usuarios', [UsuarioApiController::class, 'index']);
+        Route::get('/roles', [UsuarioApiController::class, 'roles']);
+        Route::post('/usuarios', [UsuarioApiController::class, 'store']);
+        Route::get('/usuarios/{id}', [UsuarioApiController::class, 'show']);
+        Route::match(['PUT', 'POST', 'PATCH'], '/usuarios/{id}', [UsuarioApiController::class, 'update']);
+        Route::match(['POST', 'PATCH'], '/usuarios/{id}/toggle-estado', [UsuarioApiController::class, 'toggleEstado']);
+
+        // Reportes y Analítica
+        Route::get('/reportes/resumen', [ReporteApiController::class, 'resumen']);
+        Route::get('/reportes/metodos-pago', [ReporteApiController::class, 'metodosPago']);
+        Route::get('/reportes/top-productos', [ReporteApiController::class, 'topProductos']);
     });
 
     // 6. Devoluciones (Consulta y Solicitud)
